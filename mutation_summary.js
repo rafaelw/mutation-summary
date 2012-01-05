@@ -600,23 +600,17 @@
     }
   }
 
-  function validateOptions(options) {
-    // TODO(rafaelw): Implement
-    return options;
-  }
-
-  var validNamePart = '[a-zA-Z:_]+[a-zA-Z0-9_\\-:\\.]*';
-  var textPart = '[^\\]^=]*';
-
-  var elementFilterPattern = new RegExp('^(' + validNamePart + ')' +
-                                        '(\\[(' + validNamePart + ')' +
-                                          '(=(' + textPart + ')){0,1}' +
-                                        '\\]){0,1}$');
-
   function parseElementFilters(filters) {
+    var validNamePart = '[a-zA-Z:_]+[a-zA-Z0-9_\\-:\\.]*';
+    var textPart = '[^\\]^=]*';
+
+    var elementFilterPattern = new RegExp('^(' + validNamePart + ')' +
+                                          '(\\[(' + validNamePart + ')' +
+                                            '(=(' + textPart + ')){0,1}' +
+                                          '\\]){0,1}$');
+
     var copy = filters.concat();
     filters.length = 0;
-    var attributes = {};
 
     for (var i = 0; i < copy.length; i++) {
       var text = copy[i];
@@ -630,12 +624,53 @@
 
       if (matches[2]) {
         filter.attrName = matches[3];
-        attributes[filter.attrName] = true;
         if (matches[4])
           filter.attrValue = matches[5];
       }
       filters.push(filter);
     }
+  }
+
+  function validateOptions(options) {
+    var validOptions = {
+      'childList': true,
+      'elementFilter': true,
+      'attributes': true,
+      'attributeFilter': true,
+      'characterData': true,
+      'reordered': true,
+      'rootNode': true,
+      'callback': true,
+      'observeOwnChanges': true
+    };
+
+    for (var opt in options) {
+      if (!(opt in validOptions))
+        throw Error('Invalid option: ' + opt);
+    }
+
+    if (typeof options.callback !== 'function')
+      throw Error('Invalid options: callback is required and must be a function');
+
+    if (options.elementFilter && !options.childList)
+      throw Error('Invalid options: elementFilter requires childList');
+
+    if (options.attributeFilter && !options.attributes)
+      throw Error('Invalid options: attributeFilter requires attributes');
+
+    if (options.elementFilter)
+      parseElementFilters(options.elementFilter);
+
+    return options;
+  }
+
+  function elementFilterAttributes(filters) {
+    var attributes = {};
+
+    filters.forEach(function(filter) {
+      if (filter.attrName)
+        attributes[filter.attrName] = true;
+    });
 
     return Object.keys(attributes);
   }
@@ -650,7 +685,7 @@
       observerOptions.childList = true;
 
       if (options.elementFilter) {
-        elementFilterObservedAttributes = parseElementFilters(options.elementFilter);
+        elementFilterObservedAttributes = elementFilterAttributes(options.elementFilter);
       }
     }
 
@@ -658,8 +693,7 @@
       observerOptions.attributes = true;
       observerOptions.attributeOldValue = true;
 
-      var attributeFilter = options.attributeFilter && options.attributeFilter.length ?
-          options.attributeFilter : []; elementFilterObservedAttributes;
+      var attributeFilter = options.attributeFilter ? options.attributeFilter : [];
 
       attributeFilter = attributeFilter.concat(elementFilterObservedAttributes);
 
@@ -690,7 +724,7 @@
       var added = [];
       var removed = [];
       var reparented = [];
-      var reordered = [];
+      var reordered = options.reordered ? [] : undefined;
 
       projection.getChanged(added, removed, reparented, reordered);
 

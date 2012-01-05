@@ -105,9 +105,12 @@ function assertSubtreeChanges(expectAdded,
 
   setTimeout(function() {
     compareNodeArrayIgnoreOrder(expectAdded, changed.added);
-    compareNodeArrayIgnoreOrder(expectReparented, changed.reparented);
-    compareNodeArrayIgnoreOrder(expectReordered, changed.reordered);
     compareNodeArrayIgnoreOrder(expectRemoved, changed.removed);
+    compareNodeArrayIgnoreOrder(expectReparented, changed.reparented);
+
+    assert(typeof expectReordered === typeof changed.reordered);
+    if (expectReordered)
+      compareNodeArrayIgnoreOrder(expectReordered, changed.reordered);
 
     promise.continue();
   }, 0);
@@ -160,6 +163,59 @@ function assertCharacterDataChanges(expectNodes,
   }, 0);
 
   return promise;
+}
+
+function testOptionsValidation() {
+  // Unknown option.
+  assertThrows(function() {
+    new MutationSummary({
+      childList: true,
+      schmildList: true,
+      callback: function() {}
+    });
+  });
+
+  // callback is required.
+  assertThrows(function() {
+    new MutationSummary({
+      attributes: true
+    });
+  });
+
+  // callback must be a function.
+  assertThrows(function() {
+    new MutationSummary({
+      attributes: true,
+      callback: 'foo'
+    });
+  });
+
+  // elementFilter requires childList.
+  assertThrows(function() {
+    new MutationSummary({
+      attributes: true,
+      elementFilter: ['div'],
+      callback: function() {}
+    });
+  });
+
+  // attributeFilter requires attributes.
+  assertThrows(function() {
+    new MutationSummary({
+      childList: true,
+      attributeFilter: ['foo'],
+      callback: function() {}
+    });
+  });
+
+  // Invalid elementFilter syntanx.
+  assertThrows(function() {
+    new MutationSummary({
+      childList: true,
+      elementFilter: ['div[noTrailingBracket'],
+      callback: function() {}
+    });
+  });
 }
 
 function testAttributesBasic() {
@@ -561,6 +617,24 @@ function testMoveDetectNoopSimple() {
   // Final effect is B A
 
   assertSubtreeChanges([], [], [divB], []).then(continueTesting);
+}
+
+function testReorderedRequiresOption() {
+  testCase.waitForAsync();
+
+  // Setup
+  var divA = testDiv.appendChild(document.createElement('div'));
+  divA.id = 'a';
+  var divB = testDiv.appendChild(document.createElement('div'));
+  divB.id = 'b';
+
+  startObserving({
+    childList: true
+  });
+
+  insertAfter(testDiv, divA, divB);
+
+  assertSubtreeChanges([], [], undefined, []).then(continueTesting);
 }
 
 function testIgnoreOwnChanges() {
