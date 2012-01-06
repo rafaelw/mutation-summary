@@ -229,9 +229,17 @@
         visitNode(changedNodes[i]);
     },
 
-    getAttributesChanged: function() {
+    getAttributesChanged: function(postFilter) {
       if (!this.attributesChanges)
         return []; // No attributes mutations occurred.
+
+      var attributeFilter;
+      if (postFilter) {
+        attributeFilter = {};
+        postFilter.forEach(function(attrName) {
+          attributeFilter[attrName] = true;
+        });
+      }
 
       var elements = this.changeMap.keys();
       var result = [];
@@ -249,10 +257,14 @@
         change.attributeOldValues = {};
 
         Object.keys(attributes).forEach(function(name) {
-          if (change.target.getAttribute(name) != attributes[name]) {
-            change.attributeOldValues[name] = attributes[name];
-            anyChanged = true;
-          }
+          if (attributeFilter && !attributeFilter[name])
+            return;
+
+          if (change.target.getAttribute(name) == attributes[name])
+            return;
+
+          change.attributeOldValues[name] = attributes[name];
+          anyChanged = true;
         });
 
         if (anyChanged)
@@ -304,7 +316,7 @@
      * Complexity: O(log n)
      *   n: The number of nodes in the fragment.
      */
-    reachabilityChange: function(el) {
+    reachabilityChange: function(node) {
       this.reachableCache = this.reachableCache || new NodeMap;
       this.wasReachableCache = this.wasReachableCache || new NodeMap;
 
@@ -319,8 +331,8 @@
       //   -null if the first thing that happened to it was an add.
       //   -the node it was removed from if the first thing that happened to it
       //      was a remove.
-      function getOldParent(el) {
-        var change = changeMap.get(el);
+      function getOldParent(node) {
+        var change = changeMap.get(node);
 
         if (change && change.childList) {
           if (change.oldParentNode)
@@ -329,44 +341,44 @@
             return null;
         }
 
-        return el.parentNode;
+        return node.parentNode;
       }
 
       // Is the given node reachable from the rootNode.
-      function getIsReachable(el) {
-        if (el === rootNode)
+      function getIsReachable(node) {
+        if (node === rootNode)
           return true;
-        if (!el)
+        if (!node)
           return false;
 
-        var isReachable = reachableCache.get(el);
+        var isReachable = reachableCache.get(node);
         if (isReachable === undefined) {
-          isReachable = getIsReachable(el.parentNode);
-          reachableCache.set(el, isReachable);
+          isReachable = getIsReachable(node.parentNode);
+          reachableCache.set(node, isReachable);
         }
         return isReachable;
       }
 
       // Was the given node reachable from the rootNode.
       // A node wasReachable if its oldParent wasReachable.
-      function getWasReachable(el) {
-        if (el === rootNode)
+      function getWasReachable(node) {
+        if (node === rootNode)
           return true;
-        if (!el)
+        if (!node)
           return false;
 
-        var wasReachable = wasReachableCache.get(el);
+        var wasReachable = wasReachableCache.get(node);
         if (wasReachable === undefined) {
-          wasReachable = getWasReachable(getOldParent(el));
-          wasReachableCache.set(el, wasReachable);
+          wasReachable = getWasReachable(getOldParent(node));
+          wasReachableCache.set(node, wasReachable);
         }
         return wasReachable;
       }
 
-      if (getIsReachable(el))
-        return getWasReachable(el) ? STAYED_IN : ENTERED;
+      if (getIsReachable(node))
+        return getWasReachable(node) ? STAYED_IN : ENTERED;
       else
-        return getWasReachable(el) ? EXITED : STAYED_OUT;
+        return getWasReachable(node) ? EXITED : STAYED_OUT;
     },
 
     /**
@@ -378,16 +390,20 @@
      *
      * These four states are the permutations of whether the element
      *
-     *   wasMatching(el)
-     *   isMatching(el)
+     *   wasMatching(node)
+     *   isMatching(node)
      *
      *
      * Complexity: O(1)
      */
-    matchabilityChange: function(el) {
+    matchabilityChange: function(node) {
       if (!this.elementFilter)
         return STAYED_IN;
 
+      if (node.nodeType !== Node.ELEMENT_NODE)
+        return STAYED_OUT;
+
+      var el = node;
       var attributeOldValues;
       var change = this.changeMap.get(el);
       if (change && change.attributeOldValues)
@@ -600,14 +616,32 @@
     }
   }
 
-  function parseElementFilters(filters) {
-    var validNamePart = '[a-zA-Z:_]+[a-zA-Z0-9_\\-:\\.]*';
-    var textPart = '[^\\]^=]*';
+  var validNamePart = '[a-zA-Z:_]+[a-zA-Z0-9_\\-:\\.]*';
+  var textPart = '.*';
 
-    var elementFilterPattern = new RegExp('^(' + validNamePart + ')' +
-                                          '(\\[(' + validNamePart + ')' +
-                                            '(=(' + textPart + ')){0,1}' +
-                                          '\\]){0,1}$');
+  var attributeFilterPattern = new RegExp('^(' + validNamePart + ')$');
+
+  var elementFilterPattern = new RegExp('^[\\W]*(' + validNamePart + ')' +
+                                        '(\\[[\\W]*(' + validNamePart + ')' +
+                                          '[\\W]*(=(' + textPart + ')){0,1}' +
+                                        '\\]){0,1}$');
+
+  function parseElementFilters(filters) {
+    var syntaxError = Error('Invalid elementFilter syntax');
+
+    function parseAttributeValue(text) {
+      text = text.trim();
+      if (!text.length)
+        throw syntaxError;
+
+      var quoteMatch = text.match(/\"(.*)\"/);
+      if (!quoteMatch)
+        quoteMatch = text.match(/\'(.*)\'/);
+      if (quoteMatch)
+        text = quoteMatch[1];
+
+      return text;
+    }
 
     var copy = filters.concat();
     filters.length = 0;
@@ -616,7 +650,7 @@
       var text = copy[i];
       var matches = text.match(elementFilterPattern);
       if (!matches)
-        throw Error('Invalid elementFilter syntax');
+        throw syntaxError;
 
       var filter = {
         tagName: matches[1].toUpperCase()
@@ -625,9 +659,19 @@
       if (matches[2]) {
         filter.attrName = matches[3];
         if (matches[4])
-          filter.attrValue = matches[5];
+          filter.attrValue = parseAttributeValue(matches[5]);
       }
       filters.push(filter);
+    }
+  }
+
+  function validateAttributeFilters(filters) {
+    if (!filters.length)
+      throw Error('Invalid option: attributeFilter must contain at least one item if specified');
+
+    for (var i = 0; i < filters.length; i++) {
+      if (!filters[i].match(attributeFilterPattern))
+        throw Error('Invalid option: invalid attribute name: ' + filters[i]);
     }
   }
 
@@ -661,6 +705,10 @@
     if (options.elementFilter)
       parseElementFilters(options.elementFilter);
 
+
+    if (options.attributeFilter)
+      validateAttributeFilters(options.attributeFilter);
+
     return options;
   }
 
@@ -693,12 +741,17 @@
       observerOptions.attributes = true;
       observerOptions.attributeOldValue = true;
 
-      var attributeFilter = options.attributeFilter ? options.attributeFilter : [];
+      if (options.attributeFilter) {
+        // If no filter is specified, then all attribute changes are reported. We only need to
+        // include elementFilterObservedAttributes if attributeFilter is provided.
+        observerOptions.attributeFilter = options.attributeFilter;
 
-      attributeFilter = attributeFilter.concat(elementFilterObservedAttributes);
-
-      if (attributeFilter.length)
-        observerOptions.attributeFilter = attributeFilter;
+        if (elementFilterObservedAttributes.length) {
+          options.postAttributeFilter = observerOptions.attributeFilter;
+          observerOptions.attributeFilter =
+              observerOptions.attributeFilter.concat(elementFilterObservedAttributes);
+        }
+      }
     }
 
     if (options.characterData) {
@@ -737,7 +790,7 @@
     }
 
     if (options.attributes) {
-      summary.attributes = projection.getAttributesChanged();
+      summary.attributes = projection.getAttributesChanged(options.postAttributeFilter);
     }
 
     if (options.characterData) {

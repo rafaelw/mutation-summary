@@ -216,6 +216,30 @@ function testOptionsValidation() {
       callback: function() {}
     });
   });
+
+  assertThrows(function() {
+    new MutationSummary({
+      attributes: true,
+      attributeFilter: [],
+      callback: function() {}
+    });
+  });
+
+  assertThrows(function() {
+    new MutationSummary({
+      attributes: true,
+      attributeFilter: [' '],
+      callback: function() {}
+    });
+  });
+
+  assertThrows(function() {
+    new MutationSummary({
+      attributes: true,
+      attributeFilter: ['"'],
+      callback: function() {}
+    });
+  });
 }
 
 function testAttributesBasic() {
@@ -240,6 +264,30 @@ function testAttributesBasic() {
       [{ 'foo': 'bar', 'boo': 'bag' }]).then(continueTesting);
 }
 
+function testAttributesAndElementFilter() {
+  testCase.waitForAsync();
+
+  var div = testDiv.appendChild(document.createElement('div'));
+  div.setAttribute('foo', 'bar');
+  div.setAttribute('baz', 'bat');
+  div.setAttribute('boo', 'bag');
+
+  startObserving({
+    childList: true,
+    elementFilter: ['div[foo]'],
+    attributes: true
+  });
+
+  div.setAttribute('foo', 'bar2');
+  div.setAttribute('baz', 'bat2');
+  div.setAttribute('baz', 'bat');
+  div.setAttribute('boo', 'bag2');
+  div.setAttribute('boo', 'bag3');
+
+  assertAttributeChanges([div],
+      [{ 'foo': 'bar', 'boo': 'bag' }]).then(continueTesting);
+}
+
 function testAttributesFilter() {
   testCase.waitForAsync();
 
@@ -251,6 +299,30 @@ function testAttributesFilter() {
   startObserving({
     attributes: true,
     attributeFilter: ['foo', 'boo']
+  });
+
+  div.setAttribute('foo', 'bar2');
+  div.setAttribute('baz', 'bat2');
+  div.setAttribute('boo', 'bag2');
+  div.setAttribute('boo', 'bag');
+
+  assertAttributeChanges([div],
+      [{ 'foo': 'bar' }]).then(continueTesting);
+}
+
+function testAttributesFilterAndElementFilter() {
+  testCase.waitForAsync();
+
+  var div = testDiv.appendChild(document.createElement('div'));
+  div.setAttribute('foo', 'bar');
+  div.setAttribute('baz', 'bat');
+  div.setAttribute('boo', 'bag');
+
+  startObserving({
+    attributes: true,
+    childList: true,
+    attributeFilter: ['foo', 'boo'],
+    elementFilter: ['  div[  baz  ]']
   });
 
   div.setAttribute('foo', 'bar2');
@@ -309,7 +381,7 @@ function testElementFilterAttributeSpecified() {
   startObserving({
     childList: true,
     reordered: true,
-    elementFilter: ['div[foo]', 'A', 'p[bar]', 'div[baz=bat]']
+    elementFilter: ['div[foo]', 'A', 'p[bar]', 'div[ baz = "bat" ]']
   });
 
   var div = testDiv.appendChild(document.createElement('div'));
