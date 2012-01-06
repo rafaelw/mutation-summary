@@ -199,6 +199,15 @@ function testOptionsValidation() {
     });
   });
 
+  // elementFilter must contain at least one item
+  assertThrows(function() {
+    new MutationSummary({
+      attributes: true,
+      elementFilter: [],
+      callback: function() {}
+    });
+  });
+
   // attributeFilter requires attributes.
   assertThrows(function() {
     new MutationSummary({
@@ -217,6 +226,7 @@ function testOptionsValidation() {
     });
   });
 
+  // attributeFilter must contain at least one item.
   assertThrows(function() {
     new MutationSummary({
       attributes: true,
@@ -225,6 +235,7 @@ function testOptionsValidation() {
     });
   });
 
+  // Invalid attribute names.
   assertThrows(function() {
     new MutationSummary({
       attributes: true,

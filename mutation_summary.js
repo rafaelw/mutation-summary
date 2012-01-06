@@ -643,6 +643,9 @@
       return text;
     }
 
+    if (!filters.length)
+      throw Error('Invalid option: elementFilter must contain at least one item if specified');
+
     var copy = filters.concat();
     filters.length = 0;
 
