@@ -708,10 +708,11 @@
     if (options.elementFilter)
       parseElementFilters(options.elementFilter);
 
-
     if (options.attributeFilter)
       validateAttributeFilters(options.attributeFilter);
 
+    if (options.elementFilter && options.characterData)
+      throw Error('Invalid options: elementFilter and characterData cannot be used together')
     return options;
   }
 

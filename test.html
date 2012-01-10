@@ -251,6 +251,16 @@ function testOptionsValidation() {
       callback: function() {}
     });
   });
+
+  assertThrows(function() {
+    new MutationSummary({
+      childList: true,
+      elementFilter: ['div'],
+      characterData: true,
+      callback: function() {}
+    });
+  });
+
 }
 
 function testAttributesBasic() {
