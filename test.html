@@ -56,7 +56,7 @@ function resetChanged(summary) {
 
 function startObserving(options) {
   options = options || {
-    childList: true,
+    reparented: true,
     reordered: true
   };
 
@@ -86,8 +86,14 @@ function tearDown() {
 
 function compareNodeArrayIgnoreOrder(expected, actual) {
   assertEquals(expected.length, actual.length);
+
+  var map = new MutationSummary.NodeMap;
   expected.forEach(function(node) {
-    assertTrue(actual.indexOf(node) >= 0);
+    map.set(node, true);
+  });
+
+  actual.forEach(function(node) {
+    assertTrue(map.has(node));
   });
 }
 
@@ -106,7 +112,10 @@ function assertSubtreeChanges(expectAdded,
   setTimeout(function() {
     compareNodeArrayIgnoreOrder(expectAdded, changed.added);
     compareNodeArrayIgnoreOrder(expectRemoved, changed.removed);
-    compareNodeArrayIgnoreOrder(expectReparented, changed.reparented);
+
+    assert(typeof expectReparented === typeof changed.reparented);
+    if (expectReparented)
+      compareNodeArrayIgnoreOrder(expectReparented, changed.reparented);
 
     assert(typeof expectReordered === typeof changed.reordered);
     if (expectReordered)
@@ -128,12 +137,16 @@ function assertAttributeChanges(expectNodes, expectAttributeData) {
   resetChanged();
 
   setTimeout(function() {
-    compareNodeArrayIgnoreOrder(expectNodes,
-      changed.attributes.map(function(change, index) {
-        assertObjectEquals(expectAttributeData[index], change.attributes);
-        return change.target;
-      })
-    );
+    assertEquals(expectNodes.length, changed.attributes.length);
+    var map = new MutationSummary.NodeMap;
+    expectNodes.forEach(function(node, index) {
+      map.set(node, expectAttributeData[index]);
+    });
+
+    changed.attributes.forEach(function(change) {
+      assertTrue(map.has(change.target));
+      assertObjectEquals(map.get(change.target), change.attributes);
+    });
 
     promise.continue();
   }, 0);
@@ -169,7 +182,6 @@ function testOptionsValidation() {
   // Unknown option.
   assertThrows(function() {
     new MutationSummary({
-      childList: true,
       schmildList: true,
       callback: function() {}
     });
@@ -178,31 +190,19 @@ function testOptionsValidation() {
   // callback is required.
   assertThrows(function() {
     new MutationSummary({
-      attributes: true
     });
   });
 
   // callback must be a function.
   assertThrows(function() {
     new MutationSummary({
-      attributes: true,
       callback: 'foo'
-    });
-  });
-
-  // elementFilter requires childList.
-  assertThrows(function() {
-    new MutationSummary({
-      attributes: true,
-      elementFilter: ['div'],
-      callback: function() {}
     });
   });
 
   // elementFilter must contain at least one item
   assertThrows(function() {
     new MutationSummary({
-      attributes: true,
       elementFilter: [],
       callback: function() {}
     });
@@ -211,7 +211,6 @@ function testOptionsValidation() {
   // attributeFilter requires attributes.
   assertThrows(function() {
     new MutationSummary({
-      childList: true,
       attributeFilter: ['foo'],
       callback: function() {}
     });
@@ -220,7 +219,6 @@ function testOptionsValidation() {
   // Invalid elementFilter syntanx.
   assertThrows(function() {
     new MutationSummary({
-      childList: true,
       elementFilter: ['div[noTrailingBracket'],
       callback: function() {}
     });
@@ -252,9 +250,9 @@ function testOptionsValidation() {
     });
   });
 
+  // elementFilter and characterData are mutually exclusive.
   assertThrows(function() {
     new MutationSummary({
-      childList: true,
       elementFilter: ['div'],
       characterData: true,
       callback: function() {}
@@ -271,6 +269,8 @@ function testAttributesBasic() {
   div.setAttribute('baz', 'bat');
   div.setAttribute('boo', 'bag');
 
+  var div2 = testDiv.appendChild(document.createElement('div'));
+
   startObserving({
     attributes: true
   });
@@ -280,6 +280,14 @@ function testAttributesBasic() {
   div.setAttribute('baz', 'bat');
   div.setAttribute('boo', 'bag2');
   div.setAttribute('boo', 'bag3');
+
+  // Attribute changes should be ignored for added & removed elements.
+  div2.setAttribute('foo', 'bar3');
+  testDiv.removeChild(div2);
+
+  var div3 = testDiv.appendChild(document.createElement('div'));
+  div3.setAttribute('foo', 'bar');
+  div3.setAttribute('baz', 'bat');
 
   assertAttributeChanges([div],
       [{ 'foo': 'bar', 'boo': 'bag' }]).then(continueTesting);
@@ -294,7 +302,6 @@ function testAttributesAndElementFilter() {
   div.setAttribute('boo', 'bag');
 
   startObserving({
-    childList: true,
     elementFilter: ['div[foo]'],
     attributes: true
   });
@@ -341,7 +348,6 @@ function testAttributesFilterAndElementFilter() {
 
   startObserving({
     attributes: true,
-    childList: true,
     attributeFilter: ['foo', 'boo'],
     elementFilter: ['  div[  baz  ]']
   });
@@ -384,7 +390,7 @@ function testElementFilterBasic() {
   testCase.waitForAsync();
 
   startObserving({
-    childList: true,
+    reparented: true,
     reordered: true,
     elementFilter: ['div', 'A', 'p']
   });
@@ -400,7 +406,7 @@ function testElementFilterAttributeSpecified() {
   testCase.waitForAsync();
 
   startObserving({
-    childList: true,
+    reparented: true,
     reordered: true,
     elementFilter: ['div[foo]', 'A', 'p[bar]', 'div[ baz = "bat" ]']
   });
@@ -722,12 +728,33 @@ function testReorderedRequiresOption() {
   divB.id = 'b';
 
   startObserving({
-    childList: true
+    reparented: true
   });
 
   insertAfter(testDiv, divA, divB);
 
   assertSubtreeChanges([], [], undefined, []).then(continueTesting);
+}
+
+function testReparentedRequiresOption() {
+  testCase.waitForAsync();
+
+  // Setup
+  var divA = testDiv.appendChild(document.createElement('div'));
+  divA.id = 'a';
+  var divB = divA.appendChild(document.createElement('div'));
+  divB.id = 'b';
+
+  startObserving({
+    reordered: true
+  });
+
+  testDiv.removeChild(divA);
+  divA.removeChild(divB);
+  divB.appendChild(divA);
+  testDiv.appendChild(divB);
+
+  assertSubtreeChanges([], undefined, [], []).then(continueTesting);
 }
 
 function testIgnoreOwnChanges() {
@@ -736,7 +763,6 @@ function testIgnoreOwnChanges() {
   var count = 0;
 
   var summary1 = new MutationSummary({
-    childList: true,
     observeOwnChanges: false,
     callback: function(summary) {
       count++;
@@ -757,7 +783,6 @@ function testIgnoreOwnChanges() {
   })
 
   var summary2 = new MutationSummary({
-    childList: true,
     observeOwnChanges: false,
     callback: function(summary) {
       count++;

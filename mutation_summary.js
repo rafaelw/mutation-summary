@@ -173,7 +173,7 @@
       });
     },
 
-    getChanged: function(added, removed, reparented, reordered) {
+    getChanged: function(summary) {
       if (!this.childListChanges && !this.attributesChanges)
         return; // No childList or attributes mutations occurred.
 
@@ -203,17 +203,17 @@
         var matchable = matchabilityChange(node);
 
         var action = reachableMatchableProduct[reachable][matchable];
-        if (action == ENTERED && added)
-          added.push(node);
+        if (action == ENTERED)
+          summary.added.push(node);
 
-        if (action == EXITED && removed)
-          removed.push(node);
+        if (action == EXITED)
+          summary.removed.push(node);
 
         if (action == STAYED_IN && change) {
-          if (reparented && change.oldParentNode !== node.parentNode)
-            reparented.push(node);
-          else if (reordered && wasReordered(node))
-            reordered.push(node);
+          if (summary.reparented && change.oldParentNode !== node.parentNode)
+            summary.reparented.push(node);
+          else if (summary.reordered && wasReordered(node))
+            summary.reordered.push(node);
         }
 
         if (!recurse)
@@ -680,12 +680,12 @@
 
   function validateOptions(options) {
     var validOptions = {
-      'childList': true,
       'elementFilter': true,
       'attributes': true,
       'attributeFilter': true,
       'characterData': true,
       'reordered': true,
+      'reparented': true,
       'rootNode': true,
       'callback': true,
       'observeOwnChanges': true
@@ -699,9 +699,6 @@
     if (typeof options.callback !== 'function')
       throw Error('Invalid options: callback is required and must be a function');
 
-    if (options.elementFilter && !options.childList)
-      throw Error('Invalid options: elementFilter requires childList');
-
     if (options.attributeFilter && !options.attributes)
       throw Error('Invalid options: attributeFilter requires attributes');
 
@@ -713,6 +710,7 @@
 
     if (options.elementFilter && options.characterData)
       throw Error('Invalid options: elementFilter and characterData cannot be used together')
+
     return options;
   }
 
@@ -729,16 +727,13 @@
 
   function createObserverOptions(options) {
     var observerOptions = {
+      childList: true,
       subtree: true
     }
 
     var elementFilterObservedAttributes = [];
-    if (options.childList) {
-      observerOptions.childList = true;
-
-      if (options.elementFilter) {
-        elementFilterObservedAttributes = elementFilterAttributes(options.elementFilter);
-      }
+    if (options.elementFilter) {
+      elementFilterObservedAttributes = elementFilterAttributes(options.elementFilter);
     }
 
     if (options.attributes || elementFilterObservedAttributes.length) {
@@ -768,38 +763,26 @@
 
   function createSummary(mutations, root, options) {
     var projection = new MutationProjection(root);
+
     projection.processMutations(mutations);
+    projection.elementFilter = options.elementFilter;
 
     var summary = {
       target: root,
-      type: 'summary'
+      type: 'summary',
+      added: [],
+      removed: [],
+      reparented: options.reparented ? [] : undefined,
+      reordered: options.reordered ? [] : undefined
     };
 
-    if (options.childList) {
-      projection.elementFilter = options.elementFilter;
+    projection.getChanged(summary);
 
-      var added = [];
-      var removed = [];
-      var reparented = [];
-      var reordered = options.reordered ? [] : undefined;
-
-      projection.getChanged(added, removed, reparented, reordered);
-
-      summary.added = added;
-      summary.removed = removed;
-      summary.reparented = reparented;
-
-      if (options.reordered)
-        summary.reordered = reordered;
-    }
-
-    if (options.attributes) {
+    if (options.attributes)
       summary.attributes = projection.getAttributesChanged(options.postAttributeFilter);
-    }
 
-    if (options.characterData) {
+    if (options.characterData)
       summary.characterData = projection.getCharacterDataChanged();
-    };
 
     return summary;
   }

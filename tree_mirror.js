@@ -149,7 +149,7 @@ function TreeMirrorClient(target, mirror) {
 
   var self = this;
   this.mutationSummary = new MutationSummary({
-    childList: true,
+    reparented: true,
     reordered: true,
     attributes: true,
     characterData: true,
