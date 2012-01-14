@@ -680,15 +680,15 @@
 
   function validateOptions(options) {
     var validOptions = {
+      'callback': true, // required
+      'rootNode': true,
+      'observeOwnChanges': true,
       'elementFilter': true,
-      'attributes': true,
-      'attributeFilter': true,
-      'characterData': true,
       'reordered': true,
       'reparented': true,
-      'rootNode': true,
-      'callback': true,
-      'observeOwnChanges': true
+      'attributes': true,
+      'attributeFilter': true,
+      'characterData': true
     };
 
     for (var opt in options) {
