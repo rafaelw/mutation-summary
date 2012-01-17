@@ -87,7 +87,6 @@ function testAddedRemovedFuzzer() {
   }
 
   function checkNextPass() {
-    console.log('Checking pass ' + pass);
     assertTreesEqual(testDiv, mirrorRoot);
 
     if (pass >= PASSES) {
