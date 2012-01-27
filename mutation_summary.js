@@ -277,6 +277,14 @@
       return result;
     },
 
+    getOldCharacterData: function(node) {
+      var change = this.changeMap.get(node);
+      if (!change || !change.characterData)
+        throw Error('getOldCharacterData requested on invalid node.');
+
+      return change.characterDataOldValue;
+    },
+
     getCharacterDataChanged: function() {
       if (!this.characterDataChanges)
         return []; // No characterData mutations occurred.
@@ -289,12 +297,11 @@
           continue;
 
         var change = this.changeMap.get(target);
-        if (change.characterData &&
-            target.textContent != change.characterDataOldValue)
-          result.push({
-            target: change.target,
-            oldValue: change.characterDataOldValue
-          });
+        if (!change.characterData ||
+            target.textContent == change.characterDataOldValue)
+          continue
+
+        result.push(target);
       }
 
       return result;
@@ -781,8 +788,10 @@
     if (options.attributes)
       summary.attributes = projection.getAttributesChanged(options.postAttributeFilter);
 
-    if (options.characterData)
-      summary.characterData = projection.getCharacterDataChanged();
+    if (options.characterData) {
+      summary.characterDataChanged = projection.getCharacterDataChanged();
+      summary.getOldCharacterData = projection.getOldCharacterData.bind(projection);
+    }
 
     return summary;
   }

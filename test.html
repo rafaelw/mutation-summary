@@ -165,12 +165,11 @@ function assertCharacterDataChanges(expectNodes,
   resetChanged();
 
   setTimeout(function() {
-    compareNodeArrayIgnoreOrder(expectNodes,
-      changed.characterData.map(function(change, index) {
-        assertEquals(expectOldValues[index], change.oldValue);
-        return change.target;
-      })
-    );
+    compareNodeArrayIgnoreOrder(expectNodes, changed.characterDataChanged);
+
+    expectNodes.forEach(function(node, index) {
+      assertEquals(expectOldValues[index], changed.getOldCharacterData(expectNodes[index]));
+    });
 
     promise.continue();
   }, 0);

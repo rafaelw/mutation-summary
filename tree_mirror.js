@@ -281,10 +281,10 @@ TreeMirrorClient.prototype = {
     }
   },
 
-  serializeCharacterDataChange: function(nodeData) {
+  serializeCharacterDataChange: function(node) {
     return {
-      node: this.serializeNode(nodeData.target),
-      textContent: nodeData.target.textContent
+      node: this.serializeNode(node),
+      textContent: node.textContent
     }
   },
 
@@ -292,7 +292,7 @@ TreeMirrorClient.prototype = {
     var removed = changed.removed.map(this.serializeNode, this);
     var moved = this.serializeAddedAndMoved(changed);
     var attributes = changed.attributes.map(this.serializeAttributeChange, this);
-    var text = changed.characterData.map(this.serializeCharacterDataChange, this);
+    var text = changed.characterDataChanged.map(this.serializeCharacterDataChange, this);
 
     this.mirror.applyChanged(removed, moved, attributes, text);
 
