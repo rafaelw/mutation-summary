@@ -268,17 +268,27 @@ TreeMirrorClient.prototype = {
     return moved;
   },
 
-  serializeAttributeChange: function(nodeData) {
-    var attributes = {};
+  serializeAttributeChanges: function(attributeChanged) {
+    var map = new MutationSummary.NodeMap;
 
-    Object.keys(nodeData.attributes).forEach(function(attrName) {
-      attributes[attrName] = nodeData.target.getAttribute(attrName)
+    Object.keys(attributeChanged).forEach(function(attrName) {
+      attributeChanged[attrName].forEach(function(element) {
+        var record = map.get(element);
+        if (!record) {
+          record = {
+            node: this.serializeNode(element),
+            attributes: {}
+          };
+          map.set(element, record);
+        }
+
+        record.attributes[attrName] = element.getAttribute(attrName);
+      }, this);
+    }, this);
+
+    return map.keys().map(function(element) {
+      return map.get(element);
     });
-
-    return {
-      node: this.serializeNode(nodeData.target),
-      attributes: attributes
-    }
   },
 
   serializeCharacterDataChange: function(node) {
@@ -291,7 +301,7 @@ TreeMirrorClient.prototype = {
   applyChanged: function(changed) {
     var removed = changed.removed.map(this.serializeNode, this);
     var moved = this.serializeAddedAndMoved(changed);
-    var attributes = changed.attributes.map(this.serializeAttributeChange, this);
+    var attributes = this.serializeAttributeChanges(changed.attributeChanged);
     var text = changed.characterDataChanged.map(this.serializeCharacterDataChange, this);
 
     this.mirror.applyChanged(removed, moved, attributes, text);

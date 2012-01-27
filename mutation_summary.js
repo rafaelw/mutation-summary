@@ -229,9 +229,20 @@
         visitNode(changedNodes[i]);
     },
 
+    getOldAttribute: function(element, attrName) {
+      var change = this.changeMap.get(element);
+      if (!change || !change.attributes)
+        throw Error('getOldAttribute requested on invalid node.');
+
+      if (!change.attributeOldValues.hasOwnProperty(attrName))
+        throw Error('getOldAttribute requested for unchanged attribute name.');
+
+      return change.attributeOldValues[attrName];
+    },
+
     getAttributesChanged: function(postFilter) {
       if (!this.attributesChanges)
-        return []; // No attributes mutations occurred.
+        return {}; // No attributes mutations occurred.
 
       var attributeFilter;
       if (postFilter) {
@@ -241,37 +252,34 @@
         });
       }
 
-      var elements = this.changeMap.keys();
-      var result = [];
-      for (var i = 0; i < elements.length; i++) {
-        var target = elements[i];
-        if (STAYED_IN != this.reachabilityChange(target) || STAYED_IN != this.matchabilityChange(target))
+      var result = {};
+
+      var nodes = this.changeMap.keys();
+      for (var i = 0; i < nodes.length; i++) {
+        var node = nodes[i];
+
+        if (STAYED_IN != this.reachabilityChange(node) || STAYED_IN != this.matchabilityChange(node))
           continue;
 
-        var change = this.changeMap.get(target);
-        var attributes = change.attributeOldValues;
-        if (!attributes)
+        var change = this.changeMap.get(node);
+        if (!change.attributes)
           continue;
 
-        var anyChanged = false;
-        change.attributeOldValues = {};
+        var element = node;
+        var oldValues = change.attributeOldValues;
 
-        Object.keys(attributes).forEach(function(name) {
+        Object.keys(oldValues).forEach(function(name) {
           if (attributeFilter && !attributeFilter[name])
             return;
 
-          if (change.target.getAttribute(name) == attributes[name])
+          if (element.getAttribute(name) == oldValues[name])
             return;
 
-          change.attributeOldValues[name] = attributes[name];
-          anyChanged = true;
-        });
+          if (!result[name])
+            result[name] = [];
 
-        if (anyChanged)
-          result.push({
-            target: change.target,
-            attributes: change.attributeOldValues
-          });
+          result[name].push(element);
+        });
       }
 
       return result;
@@ -785,8 +793,10 @@
 
     projection.getChanged(summary);
 
-    if (options.attributes)
-      summary.attributes = projection.getAttributesChanged(options.postAttributeFilter);
+    if (options.attributes) {
+      summary.attributeChanged = projection.getAttributesChanged(options.postAttributeFilter);
+      summary.getOldAttribute = projection.getOldAttribute.bind(projection);
+    }
 
     if (options.characterData) {
       summary.characterDataChanged = projection.getCharacterDataChanged();

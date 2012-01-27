@@ -137,16 +137,23 @@ function assertAttributeChanges(expectNodes, expectAttributeData) {
   resetChanged();
 
   setTimeout(function() {
-    assertEquals(expectNodes.length, changed.attributes.length);
     var map = new MutationSummary.NodeMap;
     expectNodes.forEach(function(node, index) {
       map.set(node, expectAttributeData[index]);
     });
 
-    changed.attributes.forEach(function(change) {
-      assertTrue(map.has(change.target));
-      assertObjectEquals(map.get(change.target), change.attributes);
+    Object.keys(changed.attributeChanged).forEach(function(attrName) {
+      changed.attributeChanged[attrName].forEach(function(node) {
+        var oldValues = map.get(node);
+        assertNotUndefined(oldValues);
+        assertEquals(oldValues[attrName], changed.getOldAttribute(node, attrName));
+        delete oldValues[attrName];
+        if (!Object.keys(oldValues).length)
+          map.delete(node);
+      });
     });
+
+    assertEquals(0, map.keys().length);
 
     promise.continue();
   }, 0);
