@@ -298,7 +298,8 @@ TreeMirrorClient.prototype = {
     }
   },
 
-  applyChanged: function(changed) {
+  applyChanged: function(summaries) {
+    var changed = summaries[0]
     var removed = changed.removed.map(this.serializeNode, this);
     var moved = this.serializeAddedAndMoved(changed);
     var attributes = this.serializeAttributeChanges(changed.attributeChanged);

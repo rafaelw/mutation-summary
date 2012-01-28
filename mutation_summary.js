@@ -818,7 +818,9 @@
         observer.disconnect();
       }
 
-      callback(createSummary(mutations, root, options));
+      var summaries = [];
+      summaries.push(createSummary(mutations, root, options));
+      callback(summaries);
 
       if (!options.observeOwnChanges) {
         observer.observe(root, observerOptions);

@@ -40,9 +40,9 @@ var observer;
 var observing;
 var changed;
 
-function resetChanged(summary) {
-  if (summary) {
-    changed = summary;
+function resetChanged(summaries) {
+  if (summaries) {
+    changed = summaries[0];
   } else {
     changed = {
       added: [],
@@ -770,7 +770,8 @@ function testIgnoreOwnChanges() {
 
   var summary1 = new MutationSummary({
     observeOwnChanges: false,
-    callback: function(summary) {
+    callback: function(summaries) {
+      var summary = summaries[0];
       count++;
 
       if (count == 1) {
@@ -790,7 +791,8 @@ function testIgnoreOwnChanges() {
 
   var summary2 = new MutationSummary({
     observeOwnChanges: false,
-    callback: function(summary) {
+    callback: function(summaries) {
+      var summary = summaries[0];
       count++;
 
       if (count == 1) {
