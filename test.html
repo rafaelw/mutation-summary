@@ -462,7 +462,7 @@ function testElementFilterAttributeSpecified() {
   testCase.waitForAsync();
 
   startObserving({
-    element: ['div[foo]', 'A', 'p[bar]', 'div[ baz = "bat" ]']
+    element: ['div[foo]', 'A', '*[bar]', 'div[ baz = "bat" ]']
   });
 
   var div = testDiv.appendChild(document.createElement('div'));

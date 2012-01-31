@@ -636,7 +636,7 @@
 
   var attributeFilterPattern = new RegExp('^(' + validNamePart + ')$');
 
-  var elementFilterPattern = new RegExp('^[\\W]*(' + validNamePart + ')' +
+  var elementFilterPattern = new RegExp('^[\\W]*(\\*|' + validNamePart + ')' +
                                         '(\\[[\\W]*(' + validNamePart + ')' +
                                           '[\\W]*(=(' + textPart + ')){0,1}' +
                                         '\\]){0,1}$');
@@ -684,6 +684,8 @@
 
     return filters;
   }
+
+  MutationSummary.parseElementFilter = parseElementFilter;
 
   function validateAttribute(attribute) {
     if (typeof attribute != 'string')
@@ -764,8 +766,7 @@
           attribute: validateAttribute(request.attribute)
         }
 
-        // TODO(rafaelw): Support parsing '*[attr]' in parseElementFilter.
-        query.elementFilter = [{ tagName: '*', attrName: query.attribute }];
+        query.elementFilter = parseElementFilter([ '*[' + query.attribute + ']' ]);
 
         if (Object.keys(request).length > 1)
           throw Error('Invalid request option. attribute has no options.');
