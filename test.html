@@ -184,8 +184,10 @@ function assertAttributeChanges(expectAddedNodes, expectChangedNodes, expectOldV
   return promise;
 }
 
-function assertCharacterDataChanges(expectNodes,
-                                    expectOldValues) {
+function assertCharacterDataChanges(expectAddedNodes,
+                                    expectChangedNodes,
+                                    expectOldValues,
+                                    expectRemovedNodes) {
   var promise = {
     then: function(f) {
       this.continue = f;
@@ -195,10 +197,13 @@ function assertCharacterDataChanges(expectNodes,
   resetChanged();
 
   setTimeout(function() {
-    compareNodeArrayIgnoreOrder(expectNodes, changed.valueChanged);
+    compareNodeArrayIgnoreOrder(expectAddedNodes, changed.added);
+    compareNodeArrayIgnoreOrder(expectChangedNodes, changed.valueChanged);
+    compareNodeArrayIgnoreOrder(expectRemovedNodes, changed.removed);
 
-    expectNodes.forEach(function(node, index) {
-      assertEquals(expectOldValues[index], changed.getOldCharacterData(expectNodes[index]));
+    expectChangedNodes.forEach(function(node, index) {
+      assertEquals(expectOldValues[index],
+                   changed.getOldCharacterData(expectChangedNodes[index]));
     });
 
     promise.continue();
@@ -432,14 +437,20 @@ function testCharacterDataBasic() {
   });
   text.textContent = 'bar';
   comment.textContent = '456'
-  assertCharacterDataChanges([text, comment], ['foo', '123']).then(function() {
+  var comment2 = div.appendChild(document.createComment('456'));
+  comment2.textContent = '789';
+  var div2 = testDiv.appendChild(document.createElement('div'));
+
+  assertCharacterDataChanges([comment2], [text, comment], ['foo', '123'], []).then(function() {
     text.textContent = 'baz';
     text.textContent = 'bat';
-    assertCharacterDataChanges([text], ['bar']).then(function() {
+    div.removeChild(comment2);
+
+    assertCharacterDataChanges([], [text], ['bar'], [comment2]).then(function() {
       text.textContent = 'bar';
       text.textContent = 'bat'; // Restoring its original value should mean
                                 // we won't hear about the change.
-      assertCharacterDataChanges([], []).then(continueTesting);
+      assertCharacterDataChanges([], [], [], []).then(continueTesting);
     });
   });
 }
@@ -486,7 +497,6 @@ function testElementFilterAttributeSpecified() {
   });
 }
 
-// TODO(rafaelw): Add node movement to this.
 function testElementFilterWithElementAttributes() {
   testCase.waitForAsync();
 
@@ -494,6 +504,9 @@ function testElementFilterWithElementAttributes() {
   div.setAttribute('foo', 'bar');
   div.setAttribute('baz', 'bat');
   div.setAttribute('boo', 'bag');
+
+  var div2 = testDiv.appendChild(document.createElement('div'));
+
 
   startObserving({
     element: ['  div[  baz  ]'],
@@ -505,10 +518,19 @@ function testElementFilterWithElementAttributes() {
   div.setAttribute('boo', 'bag2');
   div.setAttribute('boo', 'bag');
 
-  assertElementChanges(
-    [], [],
-    { 'foo': [div] }, { 'foo': ['bar'] },
-    []).then(continueTesting);
+  div2.setAttribute('baz', 'blarg');
+
+  var div3 = testDiv.appendChild(document.createElement('div'));
+  div3.setAttribute('baz', 'bar');
+  div2.appendChild(div);
+
+  assertElementChanges([div2, div3], [div], { 'foo': [div] }, { 'foo': ['bar'] }, []).then(function() {
+    testDiv.appendChild(div);
+    div3.removeAttribute('baz');
+    testDiv.removeChild(div2);
+
+    assertElementChanges([], [div], {}, {}, [div2, div3]).then(continueTesting);
+  });
 }
 
 function testAddRemoveBasic() {

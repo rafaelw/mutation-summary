@@ -412,6 +412,17 @@
      * Complexity: O(1)
      */
     matchabilityChange: function(node) {
+      // TODO(rafaelw): Include PI, CDATA?
+      if (this.filterCharacterData) {
+        switch (node.nodeType) {
+          case Node.COMMENT_NODE:
+          case Node.TEXT_NODE:
+            return STAYED_IN;
+          default:
+            return STAYED_OUT;
+        }
+      }
+
       if (!this.elementFilter)
         return STAYED_IN;
 
@@ -868,6 +879,7 @@
 
     projection.processMutations(mutations);
     projection.elementFilter = query.elementFilter;
+    projection.filterCharacterData = query.characterData;
 
     var summary = {
       target: root,
