@@ -210,9 +210,9 @@
           summary.removed.push(node);
 
         if (action == STAYED_IN && change) {
-          if (summary.reparented && change.oldParentNode !== node.parentNode)
+          if (change.childList && summary.reparented && change.oldParentNode !== node.parentNode)
             summary.reparented.push(node);
-          else if (summary.reordered && wasReordered(node))
+          else if (change.childList && summary.reordered && wasReordered(node))
             summary.reordered.push(node);
         }
 
@@ -641,7 +641,8 @@
                                           '[\\W]*(=(' + textPart + ')){0,1}' +
                                         '\\]){0,1}$');
 
-  function parseElementFilters(filters) {
+  // TODO(rafaelw: make patterns input be just a string
+  function parseElementFilter(patterns) {
     var syntaxError = Error('Invalid elementFilter syntax');
 
     function parseAttributeValue(text) {
@@ -658,14 +659,13 @@
       return text;
     }
 
-    if (!filters.length)
-      throw Error('Invalid option: elementFilter must contain at least one item if specified');
+    if (!patterns.length)
+      throw Error('Invalid request: element must contain at least one pattern');
 
-    var copy = filters.concat();
-    filters.length = 0;
+    var filters = [];
 
-    for (var i = 0; i < copy.length; i++) {
-      var text = copy[i];
+    for (var i = 0; i < patterns.length; i++) {
+      var text = patterns[i];
       var matches = text.match(elementFilterPattern);
       if (!matches)
         throw syntaxError;
@@ -681,30 +681,53 @@
       }
       filters.push(filter);
     }
+
+    return filters;
   }
 
-  function validateAttributeFilters(filters) {
-    if (!filters.length)
-      throw Error('Invalid option: attributeFilter must contain at least one item if specified');
+  function validateAttribute(attribute) {
+    if (typeof attribute != 'string')
+      throw Error('Invalid request opion. attribute must be a non-zero length string.');
 
-    for (var i = 0; i < filters.length; i++) {
-      if (!filters[i].match(attributeFilterPattern))
-        throw Error('Invalid option: invalid attribute name: ' + filters[i]);
+    attribute = attribute.trim();
+
+    if (!attribute)
+      throw Error('Invalid request opion. attribute must be a non-zero length string.');
+
+
+    if (!attribute.match(attributeFilterPattern))
+      throw Error('Invalid request option. invalid attribute name: ' + attribute);
+
+    return attribute;
+  }
+
+  function validateElementAttributes(attribs) {
+    if (!attribs.trim().length)
+      throw Error('Invalid request option: elementAttributes must contain at least one attribute.');
+
+    var attributes = [];
+
+    var tokens = attribs.split(' ');
+    for (var i = 0; i < tokens.length; i++) {
+      var attribute = tokens[i];
+      if (!attribute)
+        continue;
+
+      attributes.push(validateAttribute(attribute));
     }
+
+    return attributes;
   }
 
   function validateOptions(options) {
     var validOptions = {
       'callback': true, // required
+      'queries': true,  // required
       'rootNode': true,
-      'observeOwnChanges': true,
-      'elementFilter': true,
-      'reordered': true,
-      'reparented': true,
-      'attributes': true,
-      'attributeFilter': true,
-      'characterData': true
+      'observeOwnChanges': true
     };
+
+    var opts = {};
 
     for (var opt in options) {
       if (!(opt in validOptions))
@@ -714,19 +737,76 @@
     if (typeof options.callback !== 'function')
       throw Error('Invalid options: callback is required and must be a function');
 
-    if (options.attributeFilter && !options.attributes)
-      throw Error('Invalid options: attributeFilter requires attributes');
+    opts.callback = options.callback;
+    opts.rootNode = options.rootNode || document;
+    opts.observeOwnChanges = options.observeOwnChanges;
 
-    if (options.elementFilter)
-      parseElementFilters(options.elementFilter);
+    if (!options.queries || !options.queries.length)
+      throw Error('Invalid options: queries must contain at least one query request object.');
 
-    if (options.attributeFilter)
-      validateAttributeFilters(options.attributeFilter);
+    opts.queries = [];
 
-    if (options.elementFilter && options.characterData)
-      throw Error('Invalid options: elementFilter and characterData cannot be used together')
+    for (var i = 0; i < options.queries.length; i++) {
+      var request = options.queries[i];
 
-    return options;
+      // all
+      if (request.all) {
+        if (Object.keys(request).length > 1)
+          throw Error('Invalid request option. all has no options.');
+
+        opts.queries.push({ all: true });
+        continue;
+      }
+
+      // attribute
+      if (request.hasOwnProperty('attribute')) {
+        var query = {
+          attribute: validateAttribute(request.attribute)
+        }
+
+        // TODO(rafaelw): Support parsing '*[attr]' in parseElementFilter.
+        query.elementFilter = [{ tagName: '*', attrName: query.attribute }];
+
+        if (Object.keys(request).length > 1)
+          throw Error('Invalid request option. attribute has no options.');
+
+        opts.queries.push(query);
+        continue;
+      }
+
+      // element
+      if (request.hasOwnProperty('element')) {
+        var requestOptionCount = Object.keys(request).length;
+        var query = {
+          element: request.element,
+          elementFilter: parseElementFilter(request.element)
+        };
+
+        if (request.hasOwnProperty('elementAttributes')) {
+          query.elementAttributes = validateElementAttributes(request.elementAttributes);
+          requestOptionCount--;
+        }
+
+        if (requestOptionCount > 1)
+          throw Error('Invalid request option. element only allows elementAttributes option.');
+
+        opts.queries.push(query);
+        continue;
+      }
+
+      // characterData
+      if (request.characterData) {
+        if (Object.keys(request).length > 1)
+          throw Error('Invalid request option. characterData has no options.');
+
+        opts.queries.push({ characterData: true });
+        continue;
+      }
+
+      throw Error('Invalid request option. Unknown query request.');
+    }
+
+    return opts;
   }
 
   function elementFilterAttributes(filters) {
@@ -740,67 +820,90 @@
     return Object.keys(attributes);
   }
 
-  function createObserverOptions(options) {
+  function createObserverOptions(request) {
     var observerOptions = {
       childList: true,
       subtree: true
     }
 
-    var elementFilterObservedAttributes = [];
-    if (options.elementFilter) {
-      elementFilterObservedAttributes = elementFilterAttributes(options.elementFilter);
-    }
-
-    if (options.attributes || elementFilterObservedAttributes.length) {
+    if (request.all) {
       observerOptions.attributes = true;
       observerOptions.attributeOldValue = true;
-
-      if (options.attributeFilter) {
-        // If no filter is specified, then all attribute changes are reported. We only need to
-        // include elementFilterObservedAttributes if attributeFilter is provided.
-        observerOptions.attributeFilter = options.attributeFilter;
-
-        if (elementFilterObservedAttributes.length) {
-          options.postAttributeFilter = observerOptions.attributeFilter;
-          observerOptions.attributeFilter =
-              observerOptions.attributeFilter.concat(elementFilterObservedAttributes);
-        }
-      }
-    }
-
-    if (options.characterData) {
       observerOptions.characterData = true;
       observerOptions.characterDataOldValue = true;
+
+      return observerOptions;
+    }
+
+    if (request.attribute) {
+      observerOptions.attributes = true;
+      observerOptions.attributeOldValue = true;
+      observerOptions.attributeFilter = [request.attribute.trim()];
+      return observerOptions;
+    }
+
+    if (request.characterData) {
+      observerOptions.characterData = true;
+      observerOptions.characterDataOldValue = true;
+      return observerOptions;
+    }
+
+    // request.element
+    var attributes = elementFilterAttributes(request.elementFilter);
+    if (request.elementAttributes)
+      attributes = attributes.concat(request.elementAttributes)
+
+    if (attributes.length) {
+      observerOptions.attributes = true;
+      observerOptions.attributeOldValue = true;
+      observerOptions.attributeFilter = attributes;
     }
 
     return observerOptions;
   }
 
-  function createSummary(mutations, root, options) {
+  function createSummary(mutations, root, query) {
     var projection = new MutationProjection(root);
 
     projection.processMutations(mutations);
-    projection.elementFilter = options.elementFilter;
+    projection.elementFilter = query.elementFilter;
 
     var summary = {
       target: root,
       type: 'summary',
       added: [],
       removed: [],
-      reparented: options.reparented ? [] : undefined,
-      reordered: options.reordered ? [] : undefined
+      reparented: query.all || query.element ? [] : undefined,
+      reordered: query.all ? [] : undefined
     };
 
     projection.getChanged(summary);
 
-    if (options.attributes) {
-      summary.attributeChanged = projection.getAttributesChanged(options.postAttributeFilter);
-      summary.getOldAttribute = projection.getOldAttribute.bind(projection);
+    if (query.all || query.attribute || query.elementAttributes) {
+      var attributeChanged = projection.getAttributesChanged(query.elementAttributes);
+
+      if (query.attribute) {
+        summary.valueChanged = [];
+        if (attributeChanged[query.attribute])
+          summary.valueChanged = attributeChanged[query.attribute];
+
+        summary.getOldAttribute = function(node) {
+          return projection.getOldAttribute(node, query.attribute);
+        }
+      } else {
+        summary.attributeChanged = attributeChanged;
+        summary.getOldAttribute = projection.getOldAttribute.bind(projection);
+      }
     }
 
-    if (options.characterData) {
-      summary.characterDataChanged = projection.getCharacterDataChanged();
+    if (query.all || query.characterData) {
+      var characterDataChanged = projection.getCharacterDataChanged()
       summary.getOldCharacterData = projection.getOldCharacterData.bind(projection);
+
+      if (query.characterData)
+        summary.valueChanged = characterDataChanged;
+      else
+        summary.characterDataChanged = characterDataChanged;
     }
 
     return summary;
@@ -808,9 +911,9 @@
 
   function MutationSummary(opts) {
     var options = validateOptions(opts);
-    var observerOptions = createObserverOptions(options);
+    var observerOptions = createObserverOptions(options.queries[0]);
 
-    var root = options.rootNode || document;
+    var root = options.rootNode;
     var callback = options.callback;
 
     var observer = new WebKitMutationObserver(function(mutations) {
@@ -819,7 +922,7 @@
       }
 
       var summaries = [];
-      summaries.push(createSummary(mutations, root, options));
+      summaries.push(createSummary(mutations, root, options.queries[0]));
       callback(summaries);
 
       if (!options.observeOwnChanges) {

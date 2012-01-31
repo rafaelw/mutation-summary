@@ -149,12 +149,9 @@ function TreeMirrorClient(target, mirror) {
 
   var self = this;
   this.mutationSummary = new MutationSummary({
-    reparented: true,
-    reordered: true,
-    attributes: true,
-    characterData: true,
     rootNode: target,
-    callback: this.applyChanged.bind(this)
+    callback: this.applyChanged.bind(this),
+    queries: [{ all: true }]
   });
 }
 
