@@ -67,6 +67,8 @@
   var ENTERED = 1;
   var STAYED_IN = 2;
   var EXITED = 3;
+  var REPARENTED = 4;
+  var REORDERED = 5;
 
   var reachableMatchableProduct = [
    /* STAYED_OUT,  ENTERED,     STAYED_IN,   EXITED                      */
@@ -171,14 +173,17 @@
             break;
         }
       });
-    },
 
-    getChanged: function(summary) {
+      // Calculate node movement.
+      var entered = this.entered = [];
+      var exited = this.exited = [];
+      var stayedIn = this.stayedIn = new NodeMap;
+      var calcReordered = true; // TODO
+
       if (!this.childListChanges && !this.attributesChanges)
         return; // No childList or attributes mutations occurred.
 
       var reachabilityChange = this.reachabilityChange.bind(this);
-      var matchabilityChange = this.matchabilityChange.bind(this);
       var wasReordered = this.wasReordered.bind(this);
 
       var visited = new NodeMap;
@@ -192,31 +197,30 @@
         var change = self.changeMap.get(node);
         var reachable = parentReachable;
 
+        // node inherits its parent's reachability change unless
+        // its parentNode was mutated.
         if ((change && change.childList) || reachable == undefined)
           reachable = reachabilityChange(node);
 
-        var recurse = reachable == ENTERED || reachable == EXITED;
+        if (reachable == ENTERED) {
+          entered.push(node);
+        } else if (reachable == EXITED) {
+          exited.push(node);
+        } else if (reachable == STAYED_IN) {
+          var movement = STAYED_IN;
 
-        if (!recurse && change && !change.attributes && !change.childList)
-          return; // Don't need to process characterData-only changes
+          if (change && change.childList) {
+            if (change.oldParentNode !== node.parentNode) {
+              movement = REPARENTED;
+            } else if (calcReordered && wasReordered(node)) {
+              movement = REORDERED;
+            }
+          }
 
-        var matchable = matchabilityChange(node);
-
-        var action = reachableMatchableProduct[reachable][matchable];
-        if (action == ENTERED)
-          summary.added.push(node);
-
-        if (action == EXITED)
-          summary.removed.push(node);
-
-        if (action == STAYED_IN && change) {
-          if (change.childList && summary.reparented && change.oldParentNode !== node.parentNode)
-            summary.reparented.push(node);
-          else if (change.childList && summary.reordered && wasReordered(node))
-            summary.reordered.push(node);
+          stayedIn.set(node, movement);
         }
 
-        if (!recurse)
+        if (reachable == STAYED_IN || reachable == STAYED_OUT)
           return;
 
         for (var child = node.firstChild; child; child = child.nextSibling) {
@@ -224,9 +228,41 @@
         }
       }
 
-      var changedNodes = this.changeMap.keys();
-      for (var i = 0; i < changedNodes.length; i++)
-        visitNode(changedNodes[i]);
+      this.changeMap.keys().forEach(function(node) {
+        visitNode(node);
+      });
+    },
+
+    getChanged: function(summary) {
+      var matchabilityChange = this.matchabilityChange.bind(this);
+
+      this.entered.forEach(function(node) {
+        var matchable = matchabilityChange(node);
+        if (matchable == ENTERED || matchable == STAYED_IN)
+          summary.added.push(node);
+      });
+
+      this.stayedIn.keys().forEach(function(node) {
+        var matchable = matchabilityChange(node);
+
+        if (matchable == ENTERED) {
+          summary.added.push(node);
+        } else if (matchable == EXITED) {
+          summary.removed.push(node);
+        } else if (matchable == STAYED_IN && (summary.reparented || summary.reordered)) {
+          var movement = this.stayedIn.get(node);
+          if (summary.reparented && movement == REPARENTED)
+            summary.reparented.push(node);
+          else if (summary.reordered && movement == REORDERED)
+            summary.reordered.push(node);
+        }
+      }, this);
+
+      this.exited.forEach(function(node) {
+        var matchable = matchabilityChange(node);
+        if (matchable == EXITED || matchable == STAYED_IN)
+          summary.removed.push(node);
+      })
     },
 
     getOldAttribute: function(element, attrName) {
