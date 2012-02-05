@@ -718,7 +718,7 @@
     if (!attribs.trim().length)
       throw Error('Invalid request option: elementAttributes must contain at least one attribute.');
 
-    var attributes = [];
+    var attributes = {};
 
     var tokens = attribs.split(' ');
     for (var i = 0; i < tokens.length; i++) {
@@ -726,10 +726,10 @@
       if (!attribute)
         continue;
 
-      attributes.push(validateAttribute(attribute));
+      attributes[validateAttribute(attribute)] = true;
     }
 
-    return attributes;
+    return Object.keys(attributes);
   }
 
   function validateOptions(options) {
