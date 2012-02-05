@@ -19,6 +19,7 @@ limitations under the License.
 <title>MutationSummary test</title>
 <script src="http://closure-library.googlecode.com/svn/trunk/closure/goog/base.js"></script>
 <script src="mutation_summary.js"></script>
+<script src="testing_util.js"></script>
 
 <script>
 goog.require('goog.testing.jsunit');
@@ -81,19 +82,6 @@ function setUp() {
 function tearDown() {
   stopObserving();
   testDiv.textContent = '';
-}
-
-function compareNodeArrayIgnoreOrder(expected, actual) {
-  assertEquals(expected.length, actual.length);
-
-  var map = new MutationSummary.NodeMap;
-  expected.forEach(function(node) {
-    map.set(node, true);
-  });
-
-  actual.forEach(function(node) {
-    assertTrue(map.has(node));
-  });
 }
 
 function assertSubtreeChanges(expectAdded,

@@ -21,6 +21,7 @@ function TreeMirror(root, delegate) {
 TreeMirror.prototype = {
   initialize: function(rootId, children) {
     this.idMap[rootId] = this.root;
+
     for (var i = 0; i < children.length; i++)
       this.deserializeNode(children[i], this.root);
   },
@@ -136,7 +137,8 @@ TreeMirror.prototype = {
   }
 }
 
-function TreeMirrorClient(target, mirror) {
+function TreeMirrorClient(target, mirror, testingQueries) {
+  this.target = target;
   this.mirror = mirror;
   this.knownNodes = new MutationSummary.NodeMap;
 
@@ -148,10 +150,18 @@ function TreeMirrorClient(target, mirror) {
   this.mirror.initialize(rootId, children);
 
   var self = this;
+
+  var queries = [{ all: true }];
+
+  if (testingQueries)
+    queries = queries.concat(testingQueries);
+
   this.mutationSummary = new MutationSummary({
     rootNode: target,
-    callback: this.applyChanged.bind(this),
-    queries: [{ all: true }]
+    callback: function(summaries) {
+      self.applyChanged(summaries);
+    },
+    queries: queries
   });
 }
 

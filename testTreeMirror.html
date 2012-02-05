@@ -20,6 +20,7 @@ limitations under the License.
 <script src="http://closure-library.googlecode.com/svn/trunk/closure/goog/base.js"></script>
 <script src="mutation_summary.js"></script>
 <script src="tree_mirror.js"></script>
+<script src="testing_util.js"></script>
 
 <script>
 goog.require('goog.testing.jsunit');
@@ -42,11 +43,11 @@ function setUp() {
   testDiv.id = 'test-div';
 }
 
-function testAddedRemovedFuzzer() {
+function testFuzzer() {
   var TREE_SIZE = 512;
   var PASSES = 128;
-  var MOVES_PER_PASS = 64;
-  var NON_DOC_ROOTS_MAX = 3;
+  var MOVES_PER_PASS = 128;
+  var NON_DOC_ROOTS_MAX = 4;
 
   testCase.waitForAsync();
 
@@ -69,14 +70,22 @@ function testAddedRemovedFuzzer() {
     getReachable(nonDoc, nonRootNodes, true);
   }
 
+  var testingQueries = [{ characterData: true} ];
+
+  var attributeQuery = { attribute: randomAttributeName() };
+  testingQueries.push(attributeQuery);
+
+  var elementQuery = {
+    element: [ randomTagname(), randomTagname() + '[' + randomAttributeName() + ']' ],
+    elementAttributes: randomAttributeName() + ' ' + randomAttributeName()
+  };
+  testingQueries.push(elementQuery);
+
   var pass = 0;
-  var mirrorRoot;
-  var mirrorClient;
+  var mirrorRoot = testDiv.cloneNode(false);
+  var mirrorClient = new TreeMirrorClient(testDiv, new TreeMirror(mirrorRoot), testingQueries);
 
   function doNextPass() {
-    mirrorRoot = testDiv.cloneNode(false);
-    mirrorClient = new TreeMirrorClient(testDiv, new TreeMirror(mirrorRoot));
-
     for (var move = 0; move < MOVES_PER_PASS; move++) {
       randomMutation(allNodes, nonRootNodes);
     }
@@ -90,6 +99,7 @@ function testAddedRemovedFuzzer() {
     assertTreesEqual(testDiv, mirrorRoot);
 
     if (pass >= PASSES) {
+      mirrorClient.disconnect();
       continueTesting();
     } else
       doNextPass();
@@ -171,6 +181,10 @@ var tagMenu = [
   'P'
 ];
 
+function randomTagname() {
+  return tagMenu[randInt(0, tagMenu.length - 1)];
+}
+
 var attributeMenu = [
   'foo',
   'bar',
@@ -181,6 +195,10 @@ var attributeMenu = [
   'coo',
   'dat'
 ];
+
+function randomAttributeName() {
+  return attributeMenu[randInt(0, attributeMenu.length - 1)];
+}
 
 var textMenu = [
   'Kermit',
@@ -193,16 +211,20 @@ var textMenu = [
   'Beaker'
 ];
 
+function randomText() {
+  return textMenu[randInt(0, textMenu.length - 1)];
+}
+
 function randomNode(maybeText) {
   var node;
   if (maybeText && !randInt(0, 8)) {
-    var text = textMenu[randInt(0, textMenu.length - 1)];
+    var text = randomText();
     if (randInt(0, 1))
       node = document.createTextNode(text);
     else
       node = document.createComment(text);
   } else {
-    node = document.createElement(tagMenu[randInt(0, tagMenu.length - 1)]);
+    node = document.createElement(randomTagname());
   }
   return node;
 }
@@ -253,7 +275,7 @@ function randomMutation(allNodes, nonRootNodes) {
   }
 
   function mutateAttribute(node) {
-    var attrName = attributeMenu[randInt(0, attributeMenu.length - 1)];
+    var attrName = randomAttributeName();
     if (randInt(0, 1))
       node.setAttribute(attrName, randInt(0, 9));
     else
@@ -261,7 +283,7 @@ function randomMutation(allNodes, nonRootNodes) {
   }
 
   function mutateText(node) {
-    node.textContent = textMenu[randInt(0, textMenu.length - 1)];
+    node.textContent = randomText();
   }
 
   var node = selectNodeAtRandom(nonRootNodes);

@@ -832,44 +832,60 @@
     return Object.keys(attributes);
   }
 
-  function createObserverOptions(request) {
+  function createObserverOptions(queries) {
     var observerOptions = {
       childList: true,
       subtree: true
     }
 
-    if (request.all) {
+    var attributeFilter;
+    function observeAttributes(attributes) {
+      if (observerOptions.attributes && !attributeFilter)
+        return; // already observing all.
+
       observerOptions.attributes = true;
       observerOptions.attributeOldValue = true;
-      observerOptions.characterData = true;
-      observerOptions.characterDataOldValue = true;
 
-      return observerOptions;
+      if (!attributes) {
+        // observe all.
+        attributeFilter = undefined;
+        return;
+      }
+
+      // add to observed.
+      attributeFilter = attributeFilter || {};
+      attributes.forEach(function(attribute) {
+        attributeFilter[attribute] = true;
+      });
     }
 
-    if (request.attribute) {
-      observerOptions.attributes = true;
-      observerOptions.attributeOldValue = true;
-      observerOptions.attributeFilter = [request.attribute.trim()];
-      return observerOptions;
-    }
+    queries.forEach(function(request) {
+      if (request.characterData) {
+        observerOptions.characterData = true;
+        observerOptions.characterDataOldValue = true;
+        return;
+      }
 
-    if (request.characterData) {
-      observerOptions.characterData = true;
-      observerOptions.characterDataOldValue = true;
-      return observerOptions;
-    }
+      if (request.all) {
+        observeAttributes();
+        observerOptions.characterData = true;
+        observerOptions.characterDataOldValue = true;
+        return;
+      }
 
-    // request.element
-    var attributes = elementFilterAttributes(request.elementFilter);
-    if (request.elementAttributes)
-      attributes = attributes.concat(request.elementAttributes)
+      if (request.attribute) {
+        observeAttributes([request.attribute.trim()]);
+        return;
+      }
 
-    if (attributes.length) {
-      observerOptions.attributes = true;
-      observerOptions.attributeOldValue = true;
-      observerOptions.attributeFilter = attributes;
-    }
+      var attributes = elementFilterAttributes(request.elementFilter).concat(request.elementAttributes || []);
+      if (!attributes.length)
+        return;
+      observeAttributes(attributes);
+    });
+
+    if (attributeFilter)
+      observerOptions.attributeFilter = Object.keys(attributeFilter);
 
     return observerOptions;
   }
@@ -924,10 +940,18 @@
 
   function MutationSummary(opts) {
     var options = validateOptions(opts);
-    var observerOptions = createObserverOptions(options.queries[0]);
+    var observerOptions = createObserverOptions(options.queries);
 
     var root = options.rootNode;
     var callback = options.callback;
+
+    var queryValidators;
+    if (MutationSummary.createQueryValidator) {
+      queryValidators = [];
+      options.queries.forEach(function(query) {
+        queryValidators.push(MutationSummary.createQueryValidator(root, query));
+      });
+    }
 
     var observer = new WebKitMutationObserver(function(mutations) {
       if (!options.observeOwnChanges) {
@@ -935,7 +959,18 @@
       }
 
       var summaries = [];
-      summaries.push(createSummary(mutations, root, options.queries[0]));
+      options.queries.forEach(function(query) {
+        summaries.push(createSummary(mutations, root, query));
+      });
+
+      if (queryValidators) {
+        queryValidators.forEach(function(validator, index) {
+          if (!validator)
+            return;
+          validator.validate(summaries[index]);
+        });
+      }
+
       callback(summaries);
 
       if (!options.observeOwnChanges) {
