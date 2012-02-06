@@ -302,20 +302,20 @@ function testOptionsValidation() {
   // Valid element request.
   new MutationSummary({
     callback: function() {},
-    queries: [{ element: ['div'] }]
+    queries: [{ element: 'div' }]
   });
 
   // Valid element request 2.
   new MutationSummary({
     callback: function() {},
-    queries: [{ element: ['div'], elementAttributes: "foo bar" }]
+    queries: [{ element: 'div', elementAttributes: "foo bar" }]
   });
 
   // elementFilter must contain at least one item
   assertThrows(function() {
     new MutationSummary({
       callback: function() {},
-      queries: [{ element: [] }]
+      queries: [{ element: '' }]
     });
   });
 
@@ -323,7 +323,7 @@ function testOptionsValidation() {
   assertThrows(function() {
     new MutationSummary({
       callback: function() {},
-      queries: [{ element: ['div[noTrailingBracket'], }]
+      queries: [{ element: 'div[noTrailingBracket', }]
     });
   });
 
@@ -331,7 +331,7 @@ function testOptionsValidation() {
   assertThrows(function() {
     new MutationSummary({
       callback: function() {},
-      queries: [{ element: ['div[foo]'], foo: true }]
+      queries: [{ element: 'div[foo]', foo: true }]
     });
   });
 
@@ -339,7 +339,7 @@ function testOptionsValidation() {
   assertThrows(function() {
     new MutationSummary({
       callback: function() {},
-      queries: [{ element: ['div[foo]'], elementAttributes: 'foo 1bar' }]
+      queries: [{ element: 'div[foo]', elementAttributes: 'foo 1bar' }]
     });
   });
 
@@ -347,7 +347,7 @@ function testOptionsValidation() {
   assertThrows(function() {
     new MutationSummary({
       callback: function() {},
-      queries: [{ element: ['div[foo]'], elementAttributes: 'foo', foo: true }]
+      queries: [{ element: 'div[foo]', elementAttributes: 'foo', foo: true }]
     });
   });
 
@@ -447,7 +447,7 @@ function testElementFilterBasic() {
   testCase.waitForAsync();
 
   startObserving({
-    element: ['div', 'A', 'p']
+    element: 'div A p'
   });
 
   var div = testDiv.appendChild(document.createElement('div'));
@@ -461,7 +461,7 @@ function testElementFilterAttributeSpecified() {
   testCase.waitForAsync();
 
   startObserving({
-    element: ['div[foo]', 'A', '*[bar]', 'div[ baz = "bat" ]']
+    element: 'div[foo] A *[bar] div[ baz = "bat"]'
   });
 
   var div = testDiv.appendChild(document.createElement('div'));
@@ -497,7 +497,7 @@ function testElementFilterWithElementAttributes() {
 
 
   startObserving({
-    element: ['  div[  baz  ]'],
+    element: '  div[  baz  ]',
     elementAttributes: 'foo boo',
   });
 

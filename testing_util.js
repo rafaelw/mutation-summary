@@ -78,8 +78,8 @@ MutationSummary.createQueryValidator = function(root, query) {
     function elementFilter(node) {
       if (node.nodeType != Node.ELEMENT_NODE)
         return false;
-      return query.element.some(function(pattern) {
-        return node.webkitMatchesSelector(pattern);
+      return query.elementFilter.some(function(pattern) {
+        return node.webkitMatchesSelector(pattern.name);
       });
     }
 

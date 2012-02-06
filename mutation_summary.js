@@ -734,69 +734,204 @@
     }
   }
 
-  var validNamePart = '[a-zA-Z:_]+[a-zA-Z0-9_\\-:\\.]*';
-  var textPart = '.*';
+  var validNameInitialChar = /[a-zA-Z:_]+/;
+  var validNameNonInitialChar = /[a-zA-Z0-9_\-:\.]+/;
 
-  var attributeFilterPattern = new RegExp('^(' + validNamePart + ')$');
+  // TODO(rafaelw): Consider allowing backslash in the attrValue.
+  function parseElementFilter(elementFilter) {
+    var patterns = [];
+    var current;
+    var index = 0;
 
-  var elementFilterPattern = new RegExp('^[\\W]*(\\*|' + validNamePart + ')' +
-                                        '(\\[[\\W]*(' + validNamePart + ')' +
-                                          '[\\W]*(=(' + textPart + ')){0,1}' +
-                                        '\\]){0,1}$');
+    var WHITESPACE = /\s/;
 
-  // TODO(rafaelw: make patterns input be just a string
-  function parseElementFilter(patterns) {
-    var syntaxError = Error('Invalid elementFilter syntax');
+    var OUTSIDE = 0;
+    var TAGNAME = 1;
+    var BEGIN_ATTRNAME = 2;
+    var ATTRNAME = 3;
+    var END_ATTRNAME = 4;
+    var BEGIN_VALUE = 5;
+    var VALUE = 6;
+    var QUOTED_VALUE = 7;
+    var END_VALUE = 8;
+    var valueQuoteChar;
 
-    function parseAttributeValue(text) {
-      text = text.trim();
-      if (!text.length)
-        throw syntaxError;
+    var SYNTAX_ERROR = 'Invalid element syntax.';
 
-      var quoteMatch = text.match(/\"(.*)\"/);
-      if (!quoteMatch)
-        quoteMatch = text.match(/\'(.*)\'/);
-      if (quoteMatch)
-        text = quoteMatch[1];
+    var state = OUTSIDE;
+    var i = 0;
+    while (i < elementFilter.length) {
+      var c = elementFilter[i++];
+      switch (state) {
+        case OUTSIDE:
+          if (c.match(validNameInitialChar)) {
+            current = {
+              tagName: c
+            };
+            state = TAGNAME;
+            break;
+          }
+          if (c == '*') {
+            current = {
+              tagName: '*'
+            };
+            state = TAGNAME;
+            break;
+          }
+          if (c.match(WHITESPACE))
+            break;
 
-      return text;
+          throw Error(SYNTAX_ERROR);
+
+        case TAGNAME:
+          if (c.match(validNameNonInitialChar) && current.tagName != '*') {
+            current.tagName += c;
+            break;
+          }
+          if (c == '[') {
+            state = BEGIN_ATTRNAME;
+            break;
+          }
+          if (c.match(WHITESPACE)) {
+            patterns.push(current);
+            current = undefined;
+            state = OUTSIDE;
+            break;
+          }
+
+          throw Error(SYNTAX_ERROR);
+
+        case BEGIN_ATTRNAME:
+          if (c.match(WHITESPACE))
+            break;
+
+          if (c.match(validNameInitialChar)) {
+            state = ATTRNAME;
+            current.attrName = c;
+            break;
+          }
+
+          throw Error(SYNTAX_ERROR);
+
+        case ATTRNAME:
+          if (c.match(validNameNonInitialChar)) {
+            current.attrName += c;
+            break;
+          }
+          if (c.match(WHITESPACE)) {
+            state = END_ATTRNAME;
+            break;
+          }
+          if (c == '=') {
+            state = BEGIN_VALUE;
+            break;
+          }
+          if (c == ']') {
+            patterns.push(current);
+            current = undefined;
+            state = OUTSIDE;
+            break;
+          }
+
+          throw Error(SYNTAX_ERROR);
+
+        case END_ATTRNAME:
+          if (c == ']') {
+            patterns.push(current);
+            current = undefined;
+            state = OUTSIDE;
+            break;
+          }
+          if (c == '=') {
+            state = BEGIN_VALUE;
+            break;
+          }
+          if (c.match(WHITESPACE))
+            break;
+
+          throw Error(SYNTAX_ERROR);
+
+        case BEGIN_VALUE:
+          if (c == '"' || c == "'") {
+            valueQuoteChar = c;
+            current.attrValue = '';
+            state = QUOTED_VALUE;
+            break;
+          }
+          if (c.match(WHITESPACE))
+            break;
+
+          state = VALUE;
+          current.attrValue = c;
+          break;
+        case VALUE:
+          if (c.match(WHITESPACE)) {
+            state = END_VALUE;
+            break;
+          }
+          if (c == ']') {
+            patterns.push(current);
+            current = undefined;
+            state = OUTSIDE;
+            break;
+          }
+          current.attrValue += c;
+          break;
+        case QUOTED_VALUE:
+          if (c.match(WHITESPACE)) {
+            current.attrValue += c;
+            break;
+          }
+          if (c == valueQuoteChar) {
+            state = END_VALUE;
+            valueQuoteChar = undefined;
+            break;
+          }
+          current.attrValue += c;
+          break;
+        case END_VALUE:
+          if (c == ']') {
+            patterns.push(current);
+            current = undefined;
+            state = OUTSIDE;
+            break;
+          }
+          if (c.match(WHITESPACE)) {
+            break;
+          }
+
+          throw Error(SYNTAX_ERROR);
+          break;
+      }
     }
+
+    if (current) {
+      if (state == TAGNAME)
+        patterns.push(current);
+      else
+        throw Error(SYNTAX_ERROR);
+    }
+
+    patterns.forEach(function(pattern) {
+      pattern.tagName = pattern.tagName.toUpperCase();
+      pattern.name = pattern.tagName;
+      if (pattern.attrName) {
+        pattern.name += '[' + pattern.attrName;
+        if (pattern.hasOwnProperty('attrValue'))
+          pattern.name += '="' + pattern.attrValue.replace(/"/, '\\\"') + '"';
+        pattern.name += ']';
+      }
+    });
 
     if (!patterns.length)
-      throw Error('Invalid request: element must contain at least one pattern');
+      throw Error(SYNTAX_ERROR);
 
-    var filters = [];
-    var filterId = 1;
-
-    for (var i = 0; i < patterns.length; i++) {
-      var text = patterns[i];
-      var matches = text.match(elementFilterPattern);
-      if (!matches)
-        throw syntaxError;
-
-      var filter = {
-        tagName: matches[1].toUpperCase()
-      };
-
-      filter.name = filter.tagName;
-      if (matches[2]) {
-        filter.attrName = matches[3];
-        filter.name += '[' + filter.attrName;
-
-        if (matches[4]) {
-          filter.attrValue = parseAttributeValue(matches[5]);
-          filter.name += '=' + filter.attrValue;
-        }
-
-        filter.name += ']';
-      }
-      filters.push(filter);
-    }
-
-    return filters;
+    return patterns;
   }
 
   MutationSummary.parseElementFilter = parseElementFilter;
+
+  var attributeFilterPattern = new RegExp('^([a-zA-Z:_]+[a-zA-Z0-9_\\-:\\.]*)$');
 
   function validateAttribute(attribute) {
     if (typeof attribute != 'string')
@@ -877,7 +1012,7 @@
           attribute: validateAttribute(request.attribute)
         }
 
-        query.elementFilter = parseElementFilter([ '*[' + query.attribute + ']' ]);
+        query.elementFilter = parseElementFilter('*[' + query.attribute + ']');
 
         if (Object.keys(request).length > 1)
           throw Error('Invalid request option. attribute has no options.');
