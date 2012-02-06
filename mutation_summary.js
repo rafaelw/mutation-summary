@@ -185,6 +185,8 @@
       if (!this.childListChanges && !this.attributesChanges)
         return; // No childList or attributes mutations occurred.
 
+      var matchabilityChange = this.matchabilityChange.bind(this);
+
       var reachabilityChange = this.reachabilityChange.bind(this);
       var wasReordered = this.wasReordered.bind(this);
 
@@ -206,6 +208,9 @@
 
         if (reachable == STAYED_OUT)
           return;
+
+        // Cache match results for sub-patterns.
+        matchabilityChange(node);
 
         if (reachable == ENTERED) {
           entered.push(node);
@@ -474,41 +479,83 @@
       if (node.nodeType !== Node.ELEMENT_NODE)
         return STAYED_OUT;
 
+      var self = this;
       var el = node;
-      var attributeOldValues;
-      var change = this.changeMap.get(el);
-      if (change && change.attributeOldValues)
-        attributeOldValues = change.attributeOldValues;
-      else
-        attributeOldValues = {};
 
-      function checkMatch(filter, attrValue) {
-        return (filter.tagName == '*' || filter.tagName == el.tagName) &&
-               (!filter.attrName ||
-                 (attrValue != null &&
-                   (!filter.hasOwnProperty('attrValue') ||
-                     filter.attrValue == attrValue)))
+      function computeMatchabilityChange(filter) {
+        if (!self.matchCache)
+          self.matchCache = {};
+        if (!self.matchCache[filter.name])
+          self.matchCache[filter.name] = new NodeMap;
+
+        var cache = self.matchCache[filter.name];
+        var result = cache.get(el);
+        if (result !== undefined)
+          return result;
+
+        var attributeOldValues;
+        var change = self.changeMap.get(el);
+        if (change && change.attributeOldValues)
+          attributeOldValues = change.attributeOldValues;
+        else
+          attributeOldValues = {};
+
+        function checkMatch(attrValue) {
+          return (filter.tagName == '*' || filter.tagName == el.tagName) &&
+                 (!filter.attrName ||
+                   (attrValue != null &&
+                     (!filter.hasOwnProperty('attrValue') ||
+                       filter.attrValue == attrValue)))
+        }
+
+        function getIsMatching() {
+          return checkMatch(el.getAttribute(filter.attrName));
+        }
+
+        function getWasMatching() {
+          var attrValue = attributeOldValues[filter.attrName];
+          if (attrValue === undefined)
+            attrValue = el.getAttribute(filter.attrName);
+
+          return checkMatch(attrValue);
+        }
+
+        if (getIsMatching())
+          result = getWasMatching() ? STAYED_IN : ENTERED;
+        else
+          result = getWasMatching() ? EXITED : STAYED_OUT;
+
+        cache.set(el, result);
+        return result;
       }
 
-      function getIsMatching(filter) {
-        return checkMatch(filter, el.getAttribute(filter.attrName));
+      var matchChanges = this.elementFilter.map(computeMatchabilityChange);
+      var accum = STAYED_OUT;
+      var i = 0;
+
+      while (accum != STAYED_IN && i < matchChanges.length) {
+        switch(matchChanges[i]) {
+          case STAYED_IN:
+            accum = STAYED_IN;
+            break;
+          case ENTERED:
+            if (accum == EXITED)
+              accum = STAYED_IN;
+            else
+              accum = ENTERED;
+            break;
+          case EXITED:
+            if (accum == ENTERED)
+              accum = STAYED_IN;
+            else
+              accum = EXITED;
+            break;
+        }
+
+        i++;
       }
 
-      function getWasMatching(filter) {
-        var attrValue = attributeOldValues[filter.attrName];
-        if (attrValue === undefined)
-          attrValue = el.getAttribute(filter.attrName);
-
-        return checkMatch(filter, attrValue);
-      }
-
-      var isMatching = this.elementFilter.some(getIsMatching);
-      var wasMatching = this.elementFilter.some(getWasMatching);
-
-      if (isMatching)
-        return wasMatching ? STAYED_IN : ENTERED;
-      else
-        return wasMatching ? EXITED : STAYED_OUT;
+      return accum;
     },
 
     /**
@@ -719,6 +766,7 @@
       throw Error('Invalid request: element must contain at least one pattern');
 
     var filters = [];
+    var filterId = 1;
 
     for (var i = 0; i < patterns.length; i++) {
       var text = patterns[i];
@@ -730,10 +778,17 @@
         tagName: matches[1].toUpperCase()
       };
 
+      filter.name = filter.tagName;
       if (matches[2]) {
         filter.attrName = matches[3];
-        if (matches[4])
+        filter.name += '[' + filter.attrName;
+
+        if (matches[4]) {
           filter.attrValue = parseAttributeValue(matches[5]);
+          filter.name += '=' + filter.attrValue;
+        }
+
+        filter.name += ']';
       }
       filters.push(filter);
     }
@@ -935,10 +990,7 @@
     return observerOptions;
   }
 
-  function createSummary(mutations, root, query) {
-    var projection = new MutationProjection(root);
-
-    projection.processMutations(mutations);
+  function createSummary(projection, root, query) {
     projection.elementFilter = query.elementFilter;
     projection.filterCharacterData = query.characterData;
 
@@ -1003,9 +1055,19 @@
         observer.disconnect();
       }
 
+      var projection = new MutationProjection(root);
+      var elementFilter = [];
+      options.queries.forEach(function(query) {
+        if (query.elementFilter) {
+          elementFilter = elementFilter.concat(query.elementFilter);
+          projection.elementFilter = elementFilter;
+        }
+      });
+      projection.processMutations(mutations);
+
       var summaries = [];
       options.queries.forEach(function(query) {
-        summaries.push(createSummary(mutations, root, query));
+        summaries.push(createSummary(projection, root, query));
       });
 
       if (queryValidators) {
