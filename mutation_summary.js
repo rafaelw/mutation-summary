@@ -523,26 +523,26 @@
           return true;
         }
 
-        function getIsMatching() {
-          return checkMatch(el.getAttribute(filter.attrName), filter.className ? el.getAttribute('class') : undefined);
+        var attrValue = filter.attrName ? el.getAttribute(filter.attrName) : undefined;
+        var classAttrValue = filter.className ? el.getAttribute('class') : undefined;
+
+        var isMatching = checkMatch(attrValue, classAttrValue);
+        var wasMatching = isMatching;
+        if (filter.attrName && attributeOldValues.hasOwnProperty(filter.attrName)) {
+          wasMatching = undefined;
+          attrValue = attributeOldValues[filter.attrName];
         }
-
-        function getWasMatching() {
-          var attrValue = attributeOldValues[filter.attrName];
-          if (attrValue === undefined)
-            attrValue = el.getAttribute(filter.attrName);
-
-          var classAttrValue = attributeOldValues['class'];
-          if (classAttrValue === undefined && filter.className)
-            classAttrValue = el.getAttribute('class');
-
-          return checkMatch(attrValue, classAttrValue);
+        if (filter.className && attributeOldValues.hasOwnProperty('class')) {
+          wasMatching = undefined;
+          classAttrValue = attributeOldValues['class'];
         }
+        if (wasMatching === undefined)
+          wasMatching = checkMatch(attrValue, classAttrValue);
 
-        if (getIsMatching())
-          result = getWasMatching() ? STAYED_IN : ENTERED;
+        if (isMatching)
+          result = wasMatching ? STAYED_IN : ENTERED;
         else
-          result = getWasMatching() ? EXITED : STAYED_OUT;
+          result = wasMatching ? EXITED : STAYED_OUT;
 
         cache.set(el, result);
         return result;
