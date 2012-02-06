@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-(function() {
+(function(global) {
+
+  "use strict";
 
   // NodeMap UtilityClass. Exposed as MutationSummary.NodeMap.
   // TODO(rafaelw): Consider using Harmony Map when available.
@@ -36,7 +38,7 @@
   NodeMap.prototype = {
     set: function(node, value) {
       ensureId(node);
-      this.map_[node[ID_PROP]] = { k: node, v: value};
+      this.map_[node[ID_PROP]] = {k: node, v: value};
     },
     get: function(node) {
       if (ensureId(node))
@@ -72,13 +74,18 @@
   var REPARENTED = 4;
   var REORDERED = 5;
 
-  var reachableMatchableProduct = [
-   /* STAYED_OUT,  ENTERED,     STAYED_IN,   EXITED                      */
-    [ STAYED_OUT,  STAYED_OUT,  STAYED_OUT,  STAYED_OUT ], /* STAYED_OUT */
-    [ STAYED_OUT,  ENTERED,     ENTERED,     STAYED_OUT ], /* ENTERED    */
-    [ STAYED_OUT,  ENTERED,     STAYED_IN,   EXITED     ], /* STAYED_IN  */
-    [ STAYED_OUT,  STAYED_OUT,  EXITED,      EXITED     ]  /* EXITED     */
-  ];
+  /**
+   * This is no longer in use, but conceptually it still represents the policy for
+   * reporting node movement:
+   *
+   *  var reachableMatchableProduct = [
+   *  //  STAYED_OUT,  ENTERED,     STAYED_IN,   EXITED
+   *    [ STAYED_OUT,  STAYED_OUT,  STAYED_OUT,  STAYED_OUT ], // STAYED_OUT
+   *    [ STAYED_OUT,  ENTERED,     ENTERED,     STAYED_OUT ], // ENTERED
+   *    [ STAYED_OUT,  ENTERED,     STAYED_IN,   EXITED     ], // STAYED_IN
+   *    [ STAYED_OUT,  STAYED_OUT,  EXITED,      EXITED     ]  // EXITED
+   *  ];
+   */
 
   function enteredOrExited(changeType) {
     return changeType == ENTERED || changeType == EXITED;
@@ -91,96 +98,94 @@
   }
 
   MutationProjection.prototype = {
+
+    getChange: function(node) {
+      var change = this.changeMap.get(node);
+      if (!change) {
+        change = {
+          target: node
+        };
+        this.changeMap.set(node, change);
+      }
+
+      return change;
+    },
+
+    getParentChange: function(node) {
+      var change = this.getChange(node);
+      if (!change.childList) {
+        change.childList = true;
+        change.oldParentNode = null;
+      }
+
+      return change;
+    },
+
+    handleChildList: function(mutation) {
+      this.childListChanges = true;
+
+      forEach(mutation.removedNodes, function(el) {
+        var change = this.getParentChange(el);
+
+        if (change.added || change.oldParentNode)
+          change.added = false;
+        else
+          change.oldParentNode = mutation.target;
+      }, this);
+
+      forEach(mutation.addedNodes, function(el) {
+        var change = this.getParentChange(el);
+        change.added = true;
+      }, this);
+    },
+
+    handleAttributes: function(mutation) {
+      this.attributesChanges = true;
+
+      var change = this.getChange(mutation.target);
+      if (!change.attributes) {
+        change.attributes = true;
+        change.attributeOldValues = {};
+      }
+
+      var oldValues = change.attributeOldValues;
+      if (!oldValues.hasOwnProperty(mutation.attributeName)) {
+        oldValues[mutation.attributeName] = mutation.oldValue;
+      }
+    },
+
+    handleCharacterData: function(mutation) {
+      this.characterDataChanges = true;
+
+      var change = this.getChange(mutation.target);
+      if (change.characterData)
+        return;
+      change.characterData = true;
+      change.characterDataOldValue = mutation.oldValue;
+    },
+
     processMutations: function(mutations) {
       this.mutations = mutations;
-
-      var self = this;
       this.changeMap = new NodeMap;
 
-      function getChange(node) {
-        var change = self.changeMap.get(node);
-        if (!change) {
-          change = {
-            target: node
-          };
-          self.changeMap.set(node, change);
-        }
-
-        return change;
-      }
-
-      function getParentChange(node) {
-        var change = getChange(node);
-        if (!change.childList) {
-          change.childList = true;
-          change.oldParentNode = null;
-        }
-
-        return change;
-      }
-
-      function handleChildList(mutation) {
-        self.childListChanges = true;
-
-        forEach(mutation.removedNodes, function(el) {
-          var change = getParentChange(el);
-
-          if (change.added || change.oldParentNode)
-            change.added = false;
-          else
-            change.oldParentNode = mutation.target;
-        });
-
-        forEach(mutation.addedNodes, function(el) {
-          var change = getParentChange(el);
-          change.added = true;
-        });
-      }
-
-      function handleAttributes(mutation) {
-        self.attributesChanges = true;
-
-        var change = getChange(mutation.target);
-        if (!change.attributes) {
-          change.attributes = true;
-          change.attributeOldValues = {};
-        }
-
-        var oldValues = change.attributeOldValues;
-        if (!oldValues.hasOwnProperty(mutation.attributeName)) {
-          oldValues[mutation.attributeName] = mutation.oldValue;
-        }
-      }
-
-      function handleCharacterData(mutation) {
-        self.characterDataChanges = true;
-
-        var change = getChange(mutation.target);
-        if (change.characterData)
-          return;
-        change.characterData = true;
-        change.characterDataOldValue = mutation.oldValue;
-      }
-
       this.mutations.forEach(function(mutation) {
-        switch(mutation.type) {
+        switch (mutation.type) {
           case 'childList':
-            handleChildList(mutation);
+            this.handleChildList(mutation);
             break;
           case 'attributes':
-            handleAttributes(mutation);
+            this.handleAttributes(mutation);
             break;
           case 'characterData':
-            handleCharacterData(mutation);
+            this.handleCharacterData(mutation);
             break;
         }
-      });
+      }, this);
 
       // Calculate node movement.
       var entered = this.entered = [];
       var exited = this.exited = [];
       var stayedIn = this.stayedIn = new NodeMap;
-      var calcReordered = true; // TODO
 
       if (!this.childListChanges && !this.attributesChanges)
         return; // No childList or attributes mutations occurred.
@@ -222,7 +227,7 @@
           if (change && change.childList) {
             if (change.oldParentNode !== node.parentNode) {
               movement = REPARENTED;
-            } else if (calcReordered && wasReordered(node)) {
+            } else if (self.calcReordered && wasReordered(node)) {
               movement = REORDERED;
             }
           }
@@ -765,11 +770,11 @@
     var WHITESPACE = /\s/;
 
     var OUTSIDE = 0;
-    var TAGNAME = 1;
-    var CLASSNAME = 2;
-    var BEGIN_ATTRNAME = 3;
-    var ATTRNAME = 4;
-    var END_ATTRNAME = 5;
+    var TAG_NAME = 1;
+    var CLASS_NAME = 2;
+    var BEGIN_ATTR_NAME = 3;
+    var ATTR_NAME = 4;
+    var END_ATTR_NAME = 5;
     var BEGIN_VALUE = 6;
     var VALUE = 7;
     var QUOTED_VALUE = 8;
@@ -788,14 +793,14 @@
             current = {
               tagName: c
             };
-            state = TAGNAME;
+            state = TAG_NAME;
             break;
           }
           if (c == '*') {
             current = {
               tagName: '*'
             };
-            state = TAGNAME;
+            state = TAG_NAME;
             break;
           }
           if (c == '.') {
@@ -803,7 +808,7 @@
               tagName: '*',
               className: ''
             };
-            state = CLASSNAME;
+            state = CLASS_NAME;
             break;
           }
           if (c.match(WHITESPACE))
@@ -811,10 +816,10 @@
 
           throw Error(SYNTAX_ERROR);
 
-        case TAGNAME:
+        case TAG_NAME:
           if (c == '.') {
             current.className = '';
-            state = CLASSNAME;
+            state = CLASS_NAME;
             break;
           }
           if (c.match(validNameNonInitialChar) && current.tagName != '*') {
@@ -822,7 +827,7 @@
             break;
           }
           if (c == '[') {
-            state = BEGIN_ATTRNAME;
+            state = BEGIN_ATTR_NAME;
             break;
           }
           if (c.match(WHITESPACE)) {
@@ -834,7 +839,7 @@
 
           throw Error(SYNTAX_ERROR);
 
-        case CLASSNAME:
+        case CLASS_NAME:
           if (c.match(validNameNonInitialChar)) {
             current.className += c;
             break;
@@ -848,25 +853,25 @@
 
           throw Error(SYNTAX_ERROR);
 
-        case BEGIN_ATTRNAME:
+        case BEGIN_ATTR_NAME:
           if (c.match(WHITESPACE))
             break;
 
           if (c.match(validNameInitialChar)) {
-            state = ATTRNAME;
+            state = ATTR_NAME;
             current.attrName = c;
             break;
           }
 
           throw Error(SYNTAX_ERROR);
 
-        case ATTRNAME:
+        case ATTR_NAME:
           if (c.match(validNameNonInitialChar)) {
             current.attrName += c;
             break;
           }
           if (c.match(WHITESPACE)) {
-            state = END_ATTRNAME;
+            state = END_ATTR_NAME;
             break;
           }
           if (c == '=') {
@@ -882,7 +887,7 @@
 
           throw Error(SYNTAX_ERROR);
 
-        case END_ATTRNAME:
+        case END_ATTR_NAME:
           if (c == ']') {
             patterns.push(current);
             current = undefined;
@@ -911,6 +916,7 @@
           state = VALUE;
           current.attrValue = c;
           break;
+
         case VALUE:
           if (c.match(WHITESPACE)) {
             state = END_VALUE;
@@ -953,7 +959,7 @@
     }
 
     if (current) {
-      if ((state == TAGNAME) || (state == CLASSNAME && current.className.length))
+      if ((state == TAG_NAME) || (state == CLASS_NAME && current.className.length))
         patterns.push(current);
       else
         throw Error(SYNTAX_ERROR);
@@ -979,9 +985,7 @@
     return patterns;
   }
 
-  MutationSummary.parseElementFilter = parseElementFilter;
-
-  var attributeFilterPattern = new RegExp('^([a-zA-Z:_]+[a-zA-Z0-9_\\-:\\.]*)$');
+  var attributeFilterPattern = /^([a-zA-Z:_]+[a-zA-Z0-9_\-:\.]*)$/;
 
   function validateAttribute(attribute) {
     if (typeof attribute != 'string')
@@ -1005,7 +1009,7 @@
 
     var attributes = {};
 
-    var tokens = attribs.split(' ');
+    var tokens = attribs.split(/\s+/);
     for (var i = 0; i < tokens.length; i++) {
       var attribute = tokens[i];
       if (!attribute)
@@ -1052,7 +1056,7 @@
         if (Object.keys(request).length > 1)
           throw Error('Invalid request option. all has no options.');
 
-        opts.queries.push({ all: true });
+        opts.queries.push({all: true});
         continue;
       }
 
@@ -1060,7 +1064,7 @@
       if (request.hasOwnProperty('attribute')) {
         var query = {
           attribute: validateAttribute(request.attribute)
-        }
+        };
 
         query.elementFilter = parseElementFilter('*[' + query.attribute + ']');
 
@@ -1121,7 +1125,7 @@
     var observerOptions = {
       childList: true,
       subtree: true
-    }
+    };
 
     var attributeFilter;
     function observeAttributes(attributes) {
@@ -1245,6 +1249,9 @@
       var projection = new MutationProjection(root);
       var elementFilter = [];
       options.queries.forEach(function(query) {
+        if (query.all)
+          projection.calcReordered = true;
+
         if (query.elementFilter) {
           elementFilter = elementFilter.concat(query.elementFilter);
           projection.elementFilter = elementFilter;
@@ -1280,6 +1287,6 @@
   }
 
   // Externs
-  this.MutationSummary = MutationSummary;
-  this.MutationSummary.NodeMap = NodeMap;
-})();
+  global.MutationSummary = MutationSummary;
+  global.MutationSummary.NodeMap = NodeMap;
+})(this);
