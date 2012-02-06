@@ -521,6 +521,36 @@ function testElementFilterWithElementAttributes() {
   });
 }
 
+function testElementFilterWithClassname() {
+  testCase.waitForAsync();
+
+  var div = testDiv.appendChild(document.createElement('div'));
+  div.setAttribute('class', 'foo');
+
+  var div2 = testDiv.appendChild(document.createElement('div'));
+
+  startObserving({
+    element: 'div.foo'
+  });
+
+  div.setAttribute('class', 'bar foo baz');
+  div2.setAttribute('class', 'foo');
+
+  var div3 = testDiv.appendChild(document.createElement('div'));
+  div3.setAttribute('class', 'bar');
+
+  assertElementChanges([div2], [], undefined, undefined, []).then(function() {
+
+    testDiv.removeChild(div);
+    div2.removeAttribute('class');
+    div3.setAttribute('class', 'foo');
+    var div4 = testDiv.appendChild(document.createElement('div'));
+    div4.setAttribute('class', 'foobaz');
+
+    assertElementChanges([div3], [], undefined, undefined, [div, div2]).then(continueTesting);
+  });
+}
+
 function testAddRemoveBasic() {
   testCase.waitForAsync();
 

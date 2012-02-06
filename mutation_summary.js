@@ -500,16 +500,31 @@
         else
           attributeOldValues = {};
 
-        function checkMatch(attrValue) {
-          return (filter.tagName == '*' || filter.tagName == el.tagName) &&
-                 (!filter.attrName ||
-                   (attrValue != null &&
-                     (!filter.hasOwnProperty('attrValue') ||
-                       filter.attrValue == attrValue)))
+        function checkMatch(attrValue, classAttrValue) {
+          if (filter.tagName != '*' && filter.tagName != el.tagName)
+            return false;
+
+          if (filter.attrName) {
+            if (attrValue == null)
+              return false;
+            if (filter.hasOwnProperty('attrValue') && filter.attrValue != attrValue)
+              return false;
+          }
+
+          if (filter.className) {
+            if (!classAttrValue)
+              return false;
+            var retval = classAttrValue.split(' ').some(function(cn) {
+              return cn == filter.className;
+            });
+            return retval;
+          }
+
+          return true;
         }
 
         function getIsMatching() {
-          return checkMatch(el.getAttribute(filter.attrName));
+          return checkMatch(el.getAttribute(filter.attrName), filter.className ? el.getAttribute('class') : undefined);
         }
 
         function getWasMatching() {
@@ -517,7 +532,11 @@
           if (attrValue === undefined)
             attrValue = el.getAttribute(filter.attrName);
 
-          return checkMatch(attrValue);
+          var classAttrValue = attributeOldValues['class'];
+          if (classAttrValue === undefined && filter.className)
+            classAttrValue = el.getAttribute('class');
+
+          return checkMatch(attrValue, classAttrValue);
         }
 
         if (getIsMatching())
@@ -1144,10 +1163,12 @@
         return;
       }
 
+      if (request.elementFilter && request.elementFilter.some(function(f) { return f.className; } ))
+         observeAttributes(['class']);
+
       var attributes = elementFilterAttributes(request.elementFilter).concat(request.elementAttributes || []);
-      if (!attributes.length)
-        return;
-      observeAttributes(attributes);
+      if (attributes.length)
+        observeAttributes(attributes);
     });
 
     if (attributeFilter)
