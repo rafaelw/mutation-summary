@@ -67,6 +67,8 @@
   var ENTERED = 1;
   var STAYED_IN = 2;
   var EXITED = 3;
+
+  // Sub-states of STAYED_IN
   var REPARENTED = 4;
   var REORDERED = 5;
 
@@ -202,6 +204,9 @@
         if ((change && change.childList) || reachable == undefined)
           reachable = reachabilityChange(node);
 
+        if (reachable == STAYED_OUT)
+          return;
+
         if (reachable == ENTERED) {
           entered.push(node);
         } else if (reachable == EXITED) {
@@ -220,9 +225,10 @@
           stayedIn.set(node, movement);
         }
 
-        if (reachable == STAYED_IN || reachable == STAYED_OUT)
+        if (reachable == STAYED_IN)
           return;
 
+        // reachable == ENTERED || reachable == EXITED.
         for (var child = node.firstChild; child; child = child.nextSibling) {
           visitNode(child, reachable);
         }
@@ -449,6 +455,7 @@
      */
     matchabilityChange: function(node) {
       // TODO(rafaelw): Include PI, CDATA?
+      // Only include text nodes.
       if (this.filterCharacterData) {
         switch (node.nodeType) {
           case Node.COMMENT_NODE:
@@ -459,9 +466,11 @@
         }
       }
 
+      // No element filter. Include all nodes.
       if (!this.elementFilter)
         return STAYED_IN;
 
+      // Element filter. Exclude non-elements.
       if (node.nodeType !== Node.ELEMENT_NODE)
         return STAYED_OUT;
 
