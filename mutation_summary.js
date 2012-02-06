@@ -747,13 +747,14 @@
 
     var OUTSIDE = 0;
     var TAGNAME = 1;
-    var BEGIN_ATTRNAME = 2;
-    var ATTRNAME = 3;
-    var END_ATTRNAME = 4;
-    var BEGIN_VALUE = 5;
-    var VALUE = 6;
-    var QUOTED_VALUE = 7;
-    var END_VALUE = 8;
+    var CLASSNAME = 2;
+    var BEGIN_ATTRNAME = 3;
+    var ATTRNAME = 4;
+    var END_ATTRNAME = 5;
+    var BEGIN_VALUE = 6;
+    var VALUE = 7;
+    var QUOTED_VALUE = 8;
+    var END_VALUE = 9;
     var valueQuoteChar;
 
     var SYNTAX_ERROR = 'Invalid element syntax.';
@@ -778,18 +779,45 @@
             state = TAGNAME;
             break;
           }
+          if (c == '.') {
+            current = {
+              tagName: '*',
+              className: ''
+            };
+            state = CLASSNAME;
+            break;
+          }
           if (c.match(WHITESPACE))
             break;
 
           throw Error(SYNTAX_ERROR);
 
         case TAGNAME:
+          if (c == '.') {
+            current.className = '';
+            state = CLASSNAME;
+            break;
+          }
           if (c.match(validNameNonInitialChar) && current.tagName != '*') {
             current.tagName += c;
             break;
           }
           if (c == '[') {
             state = BEGIN_ATTRNAME;
+            break;
+          }
+          if (c.match(WHITESPACE)) {
+            patterns.push(current);
+            current = undefined;
+            state = OUTSIDE;
+            break;
+          }
+
+          throw Error(SYNTAX_ERROR);
+
+        case CLASSNAME:
+          if (c.match(validNameNonInitialChar)) {
+            current.className += c;
             break;
           }
           if (c.match(WHITESPACE)) {
@@ -906,7 +934,7 @@
     }
 
     if (current) {
-      if (state == TAGNAME)
+      if ((state == TAGNAME) || (state == CLASSNAME && current.className.length))
         patterns.push(current);
       else
         throw Error(SYNTAX_ERROR);
@@ -915,6 +943,9 @@
     patterns.forEach(function(pattern) {
       pattern.tagName = pattern.tagName.toUpperCase();
       pattern.name = pattern.tagName;
+      if (pattern.className) {
+        pattern.name += '.' + pattern.className;
+      }
       if (pattern.attrName) {
         pattern.name += '[' + pattern.attrName;
         if (pattern.hasOwnProperty('attrValue'))
