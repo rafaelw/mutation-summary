@@ -64,6 +64,10 @@
     }
   };
 
+  function hasOwnProperty(obj, propName) {
+    return Object.prototype.hasOwnProperty.call(obj, propName);
+  }
+
   // Reachability & Matchability changeType constants.
   var STAYED_OUT = 0;
   var ENTERED = 1;
@@ -149,7 +153,7 @@
       }
 
       var oldValues = change.attributeOldValues;
-      if (!oldValues.hasOwnProperty(mutation.attributeName)) {
+      if (!hasOwnProperty(oldValues, mutation.attributeName)) {
         oldValues[mutation.attributeName] = mutation.oldValue;
       }
     },
@@ -286,7 +290,7 @@
       if (!change || !change.attributes)
         throw Error('getOldAttribute requested on invalid node.');
 
-      if (!change.attributeOldValues.hasOwnProperty(attrName))
+      if (!hasOwnProperty(change.attributeOldValues, attrName))
         throw Error('getOldAttribute requested for unchanged attribute name.');
 
       return change.attributeOldValues[attrName];
@@ -533,7 +537,11 @@
 
         var isMatching = checkMatch(attrValue, classAttrValue);
         var wasMatching = isMatching;
-        if (filter.attrName && attributeOldValues.hasOwnProperty(filter.attrName)) {
+
+        // TODO(rafaelw): This will break if attrName is '__proto__'. The only fix is
+        // to prefix all attributeNames here so that they don't collide with __proto__.
+        // which doesn't seem worth it.
+        if (filter.attrName && hasOwnProperty(attributeOldValues, filter.attrName)) {
           wasMatching = undefined;
           attrValue = attributeOldValues[filter.attrName];
         }
