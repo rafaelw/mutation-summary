@@ -32,15 +32,15 @@ function handleChanges(summaries) {
 observer.disconnect();
 </pre></code>
 
-<p>The <code>MutationSummary</code> object is constructed with a single object argument which contains its configuration options. The most important configuration is the <code>queries</code> property which is an array that must contain at least one "query".</p>
+<p>The <code>MutationSummary</code> object is constructed with a single object argument which contains its configuration parameters. The most important parameter is the <code>queries</code> property which is an array that must contain at least one "query".</p>
 
-<p>A Query is a "view" of what has changed in the observed subtree. There are four types of queries: <code>attribute</code>, <code>element</code>, <code>characterData</code> and <code>all</code>.</p>
+<p>A Query is a view of what has changed in the observed subtree. There are four types of queries: <a href="#attribute-query"><code>attribute</code></a>, <a href="#element-query"><code>element</code></a>, <a href="#characterData-query"><code>characterData</code></a> and <a href="#all-query"><code>all</code></a>.</p>
 
-The <code>callback</code> function is invoked with a single argument which is an array of "Summaries", each corresponding to the results of the one of the provided queries. Different queries deliver different bits of information.</p>
+The <code>callback</code> function is invoked with a single argument which is an array of summary objects, each corresponding to the results of the one of the provided queries. Different queries deliver different information.</p>
 
 <h2>Query Types</h2>
 
-<h3>Observing attributes</h3>
+<h3 id="attribute-query">Observing attributes</h3>
 
 <p>The simplest case to consider is the <code>attribute</code> query.</p> Observation is begun as soon as the <code>MutationSummary</code> object is created.</p>
 
@@ -59,37 +59,16 @@ var observer = new MutationSummary({
 
 <code><pre>
 {
-  added: [array of nodes],
-  removed: [array of nodes],
-  valueChanged: [array of nodes],
-  getOldAttribute: function(node) { ... }
+  added: [array of elements],
+  removed: [array of elements],
+  valueChanged: [array of elements],
+  getOldAttribute: function(element) { ... }
 }
 </pre></code>
 
 <p>Let's imagine that immediately before invoking <code>handleChanges</code>, the MutationSummary performed the same <code>querySelector()</code> operation to determine what elements have myAttribute now. The <code>added</code> array contains elements which would be present in this set but would have been absent in the earlier one. The <code>removed</code> array contains elements which would have been in the earlier set, but absent in the present one. The <code>valueChanged</code> array contains elements which would have been in both sets (remained in the document), but for whom the <em>value</em> of myAttribute has changed. Passing any of these elements to the provided <code>getOldAttribute</code> function will return the previous value of myAttribute for the given element.</p>
 
-<h3>Observation options</h3>
-
-<p>Before we move on to looking at the other queries, let's stop and look at two important options that apply to all queries. They have sensible default values, but may be useful to override. We could have created our MutationSummary like this:</p>
-
-<code><pre>
-var observer = new MutationSummary({
-  callback: handleChanges,
-  rootNode: myDiv,
-  observeOwnChanges: true,
-  queries: [{ attribute: 'myAttribute' }]
-});
-</pre></code>
-
-<h4>rootNode</h4>
-
-<p>The <code>rootNode</code> option allows you to create an MutationSummary which is observing a DOM subtree rooted at the provided node (myDiv, in this case). This can be useful if you know you only care about a portion of the document, or if you want to observe a subtree which isn't contained in the current <code>window.document</code>. If left absent, window.document is used as the root of observation and the entire default document is observed for changes.</p>
-
-<h4>observeOwnChanges</h4>
-
-<p><code>observeOwnChanges</code> defaults to <code>false</code> which has the effect that MutationSummary doesn't track changes that are made to the DOM <em>during</em> the course of its callback. This is almost always what you want: it's just not especially useful to be told later about the changes you made. However, if you want to have those changes included, simply set <code>observeOwnChanges</code> to <code>true</code>.</p>
-
-<h3>Observing characterData</h3>
+<h3 id="characterData-query">Observing characterData</h3>
 
 <p>"character data" is an umbrella description for nodes which can live in a DOM subtree as children of element or the document but that only have a textContent. Text nodes are the most common form, there are others (such as Comment nodes). The <code>characterData</code> query looks like this: <code>{ characterData: true }</code> and returns much the same data as the <code>attribute</code> query:</p>
 
@@ -104,9 +83,9 @@ var observer = new MutationSummary({
 
 <p>As you might expect, <code>added</code> contains new character data nodes, <code>removed</code> contains characterData nodes which have been removed, and <code>valueChanged</code> contains characterData nodes which have remained but whose textValue has changed. To get the previous textValue of any <code>valueChanged</code> node, pass it to <code>getOldCharacterData</code>.</p>
 
-<h3>Observing elements</h3>
+<h3 id="element-query">Observing elements</h3>
 
-<p>Here's where it gets interesting: observing elements is what most use cases will probably want to do. Because of this, the element query is the most flexible, but let's start with the basic case which should look mostly familiar by now:</p>
+<p>Here's where it gets interesting. Observing elements is likely to be the bread and butter of many use cases. Let's start with the simplest case, and then look at an instructive example which is more complex.</p>
 
 <code><pre>
 var observer = new MutationSummary({
@@ -125,11 +104,92 @@ var observer = new MutationSummary({
 }
 </pre></code>
 
-<p><code>added</code> and <code>removed</code> are what you would expect: added and removed anchor elements. The only thing new here is the <code>reparented</code> array. <code>reparented</code> informs you that the following anchors remained in the document, but were moved to a new hierarchy position in the document, i.e. their current parentNode is different from their previous parentNode. This last bit of information is useful in use cases that depend on an element's parent or ancestry.</p>
+<p><code>added</code> and <code>removed</code> are what you would expect: added and removed anchor elements. The only thing new here is the <code>reparented</code> array. <code>reparented</code> informs you that the following anchor elements remained in the document, but were moved to a new hierarchy position in the document, i.e. their current parentNode is different from their previous parentNode. This last bit of information is useful in use cases that depend on an element's parent or ancestry.</p>
 
-<h4>More complex "elements"</h4>
+<h4>Getting more complex: a hypothetical example.</h4>
 
-<p>MutationSummary allows for a very lenient notion of what an element is. An element can simply be a tag name, but it can also be something more complex, such as <code>'*[widgetClass=button]'</code> -- which treats any element with a widgetClass attribute set to "button" as the "element" for the purposes of the query. An element query can specify its "element" as:</p>
+<p>Many UI widget libraries allow for declarative mechanisms to describe widgets. Let's take <a href="http://dojotoolkit.org/widgets">Dojo</a> for this example.</p>
+
+<p>Dojo widgets can be declared in mark-up by including a special attribute on elements: "data-dojo-type"</p>
+
+<code><pre>&ltbutton data-dojo-type="dijit.form.Button" type="button"&gt</pre></code>
+
+<p>To Dojo, basically any element that has the data-dojo-type attribute <em>is</em> a Dojo widget element. When one of these appears, Dojo might like to respond correctly by building the appropriate widget. The MutationSummary element can be described using a simplified selector syntax. In this case,</p>
+
+<code><pre>
+var observer = new MutationSummary({
+  callback: handleChanges,
+  queries: [{ element: '*[data-dojo-type]' }]
+});
+</pre></code>
+
+<p><code>handleChanges</code> is told whenever one of these "elements" enters the page. Note that because of how this element is defined, it can enter the document by either literally being moved into the document, or by having an existing element have its data-dojo-type attribute added. In both cases, the "element" is new, from this observer's point of view.</p>
+
+<p>Now, let's imagine that Dojo would like to support allowing widgets to be  changed dynamically in-line via changes to the value of their special attributes. The MutationSummary element query allows you to listen to the values of any attribute <em>on</em> the observed element. In order to do this, Dojo wants to hear about changes to the <em>value</em> of the data-dojo-type attribute. Additionally, many dojo widgets are further configured with another attribute called data-dojo-props.</p>
+
+<code><pre>
+var observer = new MutationSummary({
+  callback: handleChanges,
+  queries: [{ element: '*[data-dojo-type]', elementAttributes: "data-dojo-type data-dojo-props" }]
+});
+</pre></code>
+
+<p><code>elementAttributes</code> is an optional parameter to the element query. It says: "tell me about changes in value to any of the following attributes on any matching element which has remained in the document". In this case, the query will report changes in value for both the data-dojo-type and data-dojo-props attributes on "*[data-dojo-type]" elements which have remained in the document. When the elementAttributes parameter is requested, the summary object returned will have two additional properties:</p>
+
+<code><pre>
+{
+  added: [array of elements],
+  removed: [array of elements],
+  reparented: [array of elements],
+  attributeChanged: {
+    'data-dojo-type': [array of elements],
+    'data-dojo-props': [array of elements]
+  },
+  getOldAttribute(element, attrName) { ... }
+}
+</pre></code>
+
+<p><code>attributeChanged</code> will be an object of key-value pairs with one key for each observed attribute. Each key-value pair maps the given attribute name to an array of elements which had that attribute change value. <code>getOldAttribute</code> can be used to retrieve the old value of the attribute for elements which appeared in a attributeChanged array. Note that because the element query supports observing multiple attribute names, this version of getOldAttribute takes two parameters: the element and the attribute name.</p>
+
+<p>Also, let's take a second to note another cool benefit of MutationSummary being built on Mutation Observers, as opposed to DOM Mutation Events: If Dojo wanted to support this kind of dynamic changing of its widgets, script might do so like this:</p>
+
+<code><pre>
+// my is &ltbutton data-dojo-type="dijit.form.Button" type="button"&gt.
+myDiv.setAttribute('data-dojo-type', 'dijit.layout.StackController');
+myDiv.setAttribute('data-dojo-props', 'containerId:"stackContainer"');
+</pre></code>
+
+<p>If Dojo was notified immediately after the first setAttribute (as would be the case with DOM Mutation Events), it might have a hard time interpreting the meaning of the change. The code is about to set the data-dojo-props attribute so that the widget is fully configured, but Dojo wouldn't know that. At best it'll have to do a bunch of work twice (once after each setAttribute), and at worst it'll get confused and error in some way. Because the <a href="#delivery">delivery</a> for Mutation Observer is asynchronous, Dojo will know that the script that made this change is done and it is safe the go rebuild this widget in a new configuration.</p>
+
+<p>So what if Dojo wants to listen to multiple types of elements? MutationSummary can take multiple queries and deliver results for each separately in the same callback. Not only is this convenient for Dojo, so it can go do all of it's work at once, it's actually highly efficient because MutationSummary can do most of its compute work once and provide multiple different views of the output. One example of why Dojo might want this is that it has an event-handling mechanism which allows widgets to have connected behavior:</p>
+
+<code><pre>
+&ltbutton data-dojo-type="dijit.form.Button" type="button"&gtClick me too!
+    &ltscript type="dojo/method" data-dojo-event="onClick" data-dojo-args="evt"&gt
+        // Do something:
+        dojo.byId("result2").innerHTML += "Thank you! ";
+    &lt/script&gt
+&lt/button&gt
+&ltdiv id="result2"&gt&lt/div&gt
+</pre></code>
+
+<p>In order to also observe script elements with the type="dojo/method" attribute and the values of data-dojo-event and data-dojo-args attributes on them, it would add another query:</p>
+
+<code><pre>
+var observer = new MutationSummary({
+  callback: handleChanges,
+  queries: [{ element: '*[data-dojo-type]', elementAttributes: "data-dojo-type data-dojo-props" },
+            { element: 'script[type="dojo/method"', elementAttributes: "data-dojo-event data-dojo-args"}]
+});
+</pre></code>
+
+<p>The <code>summaries</code> argument provided to <code>handleChanges</code> will be an array containing the results of the two queries requested, in the order they were requested.</p>
+
+<p>Ok, so returning from our example, the element query is flexible in two main ways that will likely be of use:</p>
+
+<h4>Complex description of the element</h4>
+
+<p>MutationSummary allows for a very lenient notion of what an element is. An element can simply be a tag name, but it can also be something more complex, such as <code>'*[widgetClass=button]'</code> -- which treats any element with a widgetClass attribute set to "button" as the "element" for the purposes of the query. An element query  can specify its "element" as:</p>
 
 <ul>
   <li>A tagName, i.e. "div"</li>
@@ -144,7 +204,7 @@ var observer = new MutationSummary({
 
 <h4>Observing attribute changes to matched "elements"</h4>
 
-<p>The element query optionally allows for observing changes to specific attribute values of the observed "element":</p>
+<p>The element query optionally allows for observing changes to specific attributes <em>of the observed "element"</em>:</p>
 
 <code><pre>
 var observer = new MutationSummary({
@@ -168,7 +228,7 @@ var observer = new MutationSummary({
 }
 </pre></code>
 
-<h3>Observing all changes</h3>
+<h3 id="all-query">Observing all changes</h3>
 
 <p>If you want to know about all changes, you can use the <code>all</code> query:</p>
 
@@ -198,6 +258,28 @@ var observer = new MutationSummary({
 </pre></code>
 
 <p><code>added</code>, <code>removed</code>, and <code>reparented</code> are as before except they may contain any element and any type of character data node. The new member is <code>reordered</code> which contains the set of nodes which remained in the document, and remained children of the same parent, but moved to a new <em>location</em> within their parent's childNodes list. This is useful for correctly mirroring a document, or if the exact location of a node is significant.</p>
+
+
+<h2>Observation options</h2>
+
+<p>In addition to the two required configuration parameters, <code>callback</code> and <code>queries</code>, there are two optional parameters which have sensible default values, but may be useful to override.</p>
+
+<code><pre>
+var observer = new MutationSummary({
+  callback: handleChanges,
+  rootNode: myDiv,
+  observeOwnChanges: true,
+  queries: [ ... ]
+});
+</pre></code>
+
+<h4>rootNode</h4>
+
+<p>The <code>rootNode</code> option allows you to create an MutationSummary which is observes DOM subtree rooted at the provided node (myDiv, in this case). This can be useful if you know you only care about a portion of the document, or if you want to observe a subtree which isn't contained in the current <code>window.document</code>. If left absent, window.document is used as the root of observation and the entire default document is observed for changes.</p>
+
+<h4>observeOwnChanges</h4>
+
+<p><code>observeOwnChanges</code> defaults to <code>false</code> which has the effect that MutationSummary doesn't track changes that are made to the DOM <em>during</em> the course of the <code>callback</code> invocation. This is almost always what you want: it's just not especially useful to be told later about the changes you made. However, if you want to have those changes included, simply set <code>observeOwnChanges</code> to <code>true</code>.</p>
 
 <h2>Delivery, interpretation and handling of results</h2>
 
