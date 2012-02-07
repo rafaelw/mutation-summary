@@ -17,7 +17,7 @@
 <h3>Synopsis</h3>
 
 <code><pre>
-var observer = new MutationObserver({
+var observer = new MutationSummary({
   callback: handleChanges,
   queries: [{ element: 'div' }]
 });
@@ -32,7 +32,7 @@ function handleChanges(summaries) {
 observer.disconnect();
 </pre></code>
 
-<p>The <code>MutationObserver</code> object is constructed with a single object argument which is its configuration options. The most important is configuration is the <code>queries</code> property which is an array that must contain at least one "query".</p>
+<p>The <code>MutationSummary</code> object is constructed with a single object argument which contains its configuration options. The most important configuration is the <code>queries</code> property which is an array that must contain at least one "query".</p>
 
 <p>A Query is a "view" of what has changed in the observed subtree. There are four types of queries: <code>attribute</code>, <code>element</code>, <code>characterData</code> and <code>all</code>.</p>
 
@@ -45,13 +45,13 @@ The <code>callback</code> function is invoked with a single argument which is an
 <p>The simplest case to consider is the <code>attribute</code> query.</p> Observation is begun as soon as the <code>MutationSummary</code> object is created.</p>
 
 <code><pre>
-var observer = new MutationObserver({
+var observer = new MutationSummary({
   callback: handleChanges,
   queries: [{ attribute: 'myAttribute' }]
 });
 </pre></code>
 
-<p>This instructs the MutationObserver to watch for changes to the myAttribute attribute throughout the entire document.</p>
+<p>This instructs the MutationSummary to watch for changes to the myAttribute attribute throughout the entire document.</p>
 
 <p>You can imagine that at this time, it collects the set of elements in the document which have the myAttribute attribute, i.e. <code>document.querySelector('*[myAttribute]')</code>, and stores the result in an internal list. It doesn't actually do this, because it would be far too slow, but it's helpful to think about it this way.</p>
 
@@ -70,7 +70,7 @@ var observer = new MutationObserver({
 
 <h3>Observation options</h3>
 
-<p>Before we move on to looking at the other queries, let's stop and look at two important options that apply to all queries. They have sensible default values, but may be useful to override. We could have created our MutationObserver like this:</p>
+<p>Before we move on to looking at the other queries, let's stop and look at two important options that apply to all queries. They have sensible default values, but may be useful to override. We could have created our MutationSummary like this:</p>
 
 <code><pre>
 var observer = new MutationSummary({
@@ -115,7 +115,7 @@ var observer = new MutationSummary({
 });
 </pre></code>
 
-<p>This requests the MutationObserver to track all anchor ('a') elements in the document. It delivers the following:</p>
+<p>This requests the MutationSummary to track all anchor ('a') elements in the document. It delivers the following:</p>
 
 <code><pre>
 {
