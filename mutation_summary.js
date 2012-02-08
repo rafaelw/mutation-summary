@@ -1280,7 +1280,24 @@
         });
       }
 
-      callback(summaries);
+      var changesToReport = summaries.some(function(summary) {
+        var summaryProps =  ['added', 'removed', 'reordered', 'reparented',
+                             'valueChanged', 'characterDataChanged'];
+        if (summaryProps.some(function(prop) { return summary[prop] && summary[prop].length; }))
+          return true;
+
+        if (summary.attributeChanged) {
+          var attrsChanged = Object.keys(summary.attributeChanged).some(function(attrName) {
+            return summary.attributeChanged[attrName].length
+          });
+          if (attrsChanged)
+            return true;
+        }
+        return false;
+      });
+
+      if (changesToReport)
+        callback(summaries);
 
       if (!options.observeOwnChanges) {
         observer.observe(root, observerOptions);

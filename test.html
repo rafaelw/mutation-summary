@@ -41,9 +41,12 @@ var observer;
 var observing;
 var changed;
 
+var summariesDelivered = false;
+
 function resetChanged(summaries) {
   if (summaries) {
     changed = summaries[0];
+    summariesDelivered = true;
   } else {
     changed = {
       added: [],
@@ -52,6 +55,7 @@ function resetChanged(summaries) {
       reordered: [],
       characterData: []
     }
+    summariesDelivered = false;
   }
 }
 
@@ -193,6 +197,24 @@ function assertCharacterDataChanges(expectAddedNodes,
       assertEquals(expectOldValues[index],
                    changed.getOldCharacterData(expectChangedNodes[index]));
     });
+
+    promise.continue();
+  }, 0);
+
+  return promise;
+}
+
+function assertNothingReported() {
+  var promise = {
+    then: function(f) {
+      this.continue = f;
+    }
+  };
+
+  resetChanged();
+
+  setTimeout(function() {
+    assertFalse(summariesDelivered);
 
     promise.continue();
   }, 0);
@@ -407,7 +429,12 @@ function testAttributeBasic() {
     testDiv.removeChild(div3);
     testDiv.removeChild(div);
     div2.setAttribute('foo', 'baz2');
-    assertAttributeChanges([], [div2], ['baz'], [div3, div]).then(continueTesting);
+    assertAttributeChanges([], [div2], ['baz'], [div3, div]).then(function() {
+      div2.removeAttribute('foo');
+      div2.setAttribute('foo', 'baz2');
+
+      assertNothingReported().then(continueTesting);
+    });
   });
 }
 
@@ -438,7 +465,7 @@ function testCharacterDataBasic() {
       text.textContent = 'bar';
       text.textContent = 'bat'; // Restoring its original value should mean
                                 // we won't hear about the change.
-      assertCharacterDataChanges([], [], [], []).then(continueTesting);
+      assertNothingReported().then(continueTesting);
     });
   });
 }
@@ -454,7 +481,12 @@ function testElementFilterBasic() {
   var span = div.appendChild(document.createElement('span'));
   var p = testDiv.appendChild(document.createElement('P'));
 
-  assertElementChanges([div, p], [], undefined, undefined, []).then(continueTesting);
+  assertElementChanges([div, p], [], undefined, undefined, []).then(function() {
+    testDiv.removeChild(div);
+    testDiv.appendChild(div);
+
+    assertNothingReported().then(continueTesting);
+  });
 }
 
 function testElementFilterAttributeSpecified() {
@@ -481,7 +513,13 @@ function testElementFilterAttributeSpecified() {
     p.removeAttribute('baz');
     p.setAttribute('bar', 'bar');
     div3.setAttribute('baz', 'bat');
-    assertElementChanges([p, div3], [], undefined, undefined, [div]).then(continueTesting);
+    assertElementChanges([p, div3], [], undefined, undefined, [div]).then(function() {
+
+      div3.removeAttribute('baz');
+      div3.setAttribute('baz', 'bat');
+
+      assertNothingReported().then(continueTesting);
+    });
   });
 }
 
@@ -517,7 +555,12 @@ function testElementFilterWithElementAttributes() {
     div3.removeAttribute('baz');
     testDiv.removeChild(div2);
 
-    assertElementChanges([], [div], {}, {}, [div2, div3]).then(continueTesting);
+    assertElementChanges([], [div], {}, {}, [div2, div3]).then(function() {
+      div.setAttribute('foo', 'baz');
+      div.setAttribute('foo', 'bar2');
+
+      assertNothingReported().then(continueTesting);
+    });
   });
 }
 
@@ -547,7 +590,12 @@ function testElementFilterWithClassname() {
     var div4 = testDiv.appendChild(document.createElement('div'));
     div4.setAttribute('class', 'foobaz');
 
-    assertElementChanges([div3], [], undefined, undefined, [div, div2]).then(continueTesting);
+    assertElementChanges([div3], [], undefined, undefined, [div, div2]).then(function() {
+      div3.setAttribute('class', 'bar');
+      div3.setAttribute('class', 'foo bar');
+
+      assertNothingReported().then(continueTesting);
+    });
   });
 }
 
@@ -814,7 +862,12 @@ function testMoveDetectNoop() {
 
   // Final effect is A [D] C [B G] E F
 
-  assertSubtreeChanges([divG], [], [divD, divB], []).then(continueTesting);
+  assertSubtreeChanges([divG], [], [divD, divB], []).then(function() {
+    insertAfter(testDiv, divC, divA);
+    insertAfter(testDiv, divD, divA);
+
+    assertNothingReported().then(continueTesting);
+  });
 }
 
 function testMoveDetectNoopSimple() {
