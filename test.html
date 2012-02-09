@@ -222,6 +222,108 @@ function assertNothingReported() {
   return promise;
 }
 
+function testParseElementFilter() {
+  MutationSummary.parseElementFilter('div');
+  MutationSummary.parseElementFilter(' div ');
+  MutationSummary.parseElementFilter('div,span');
+  MutationSummary.parseElementFilter(' div , span ');
+
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div span');
+  })
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div > span');
+  })
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div>span');
+  })
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div < span');
+  })
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div<span');
+  })
+
+  // TODO(rafaelw): This is currently interpretted as matching
+  // the <div:span> element. Need to support escaping somehow
+  // and throwing if an attempt is match match a pseudo selector.
+  MutationSummary.parseElementFilter('div:span');
+
+  // TODO(rafaelw): support id selector
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('#div');
+  })
+
+  MutationSummary.parseElementFilter('div.className');
+  MutationSummary.parseElementFilter(' div.className ');
+  MutationSummary.parseElementFilter('.className');
+  MutationSummary.parseElementFilter(' .className ');
+  MutationSummary.parseElementFilter('.className,.className,span.className');
+  MutationSummary.parseElementFilter(' .className, .className, span.className');
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div. className');
+  })
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div . className');
+  })
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div .className');
+  })
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div .className');
+  })
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div[foo].className');
+  })
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div.className[foo]');
+  })
+
+  MutationSummary.parseElementFilter('div[foo]');
+  MutationSummary.parseElementFilter('div[ foo ]');
+  MutationSummary.parseElementFilter(' div[ foo ] ');
+  MutationSummary.parseElementFilter('div[foo],span[bar]');
+  MutationSummary.parseElementFilter(' div[foo] , span[bar] ');
+
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div [foo]');
+  })
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div[foo');
+  })
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('divfoo]');
+  })
+
+  MutationSummary.parseElementFilter('div[foo=bar]');
+  MutationSummary.parseElementFilter('div[ foo=" bar baz " ]');
+  MutationSummary.parseElementFilter(' div[ foo = \' bar baz \'] ');
+  MutationSummary.parseElementFilter('div[foo=baz],span[bar="bat"]');
+  MutationSummary.parseElementFilter(' div[foo=boo] , span[bar="baz"] ');
+
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div[foo="bar ]');
+  })
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div[foo=bar baz]');
+  })
+
+  // TODO(rafaelw): Consider supporting lang match attribute selectors
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div[foo|=bar]');
+  })
+  // TODO(rafaelw): Consider supporting substring attribute selectors
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div[foo~=bar]');
+  })
+  // TODO(rafaelw): Consider supporting multiple attribute
+  assertThrows(function() {
+    MutationSummary.parseElementFilter('div[foo][bar]');
+  })
+
+  MutationSummary.parseElementFilter('div[foo], A, *[bar], div[ baz = "bat"]');
+}
+
 function testOptionsValidation() {
   // Unknown option.
   assertThrows(function() {
@@ -330,7 +432,21 @@ function testOptionsValidation() {
   // Valid element request 2.
   new MutationSummary({
     callback: function() {},
+    queries: [{ element: 'div, span[foo]' }]
+  });
+
+  // Valid element request 3.
+  new MutationSummary({
+    callback: function() {},
     queries: [{ element: 'div', elementAttributes: "foo bar" }]
+  });
+
+  // elementFilter doesn't support descendant selectors.
+  assertThrows(function() {
+    new MutationSummary({
+      callback: function() {},
+      queries: [{ element: 'div span[foo]' }]
+    });
   });
 
   // elementFilter must contain at least one item
@@ -474,7 +590,7 @@ function testElementFilterBasic() {
   testCase.waitForAsync();
 
   startObserving({
-    element: 'div A p'
+    element: 'div, A, p'
   });
 
   var div = testDiv.appendChild(document.createElement('div'));
@@ -493,7 +609,7 @@ function testElementFilterAttributeSpecified() {
   testCase.waitForAsync();
 
   startObserving({
-    element: 'div[foo] A *[bar] div[ baz = "bat"]'
+    element: 'div[foo], A, *[bar], div[ baz = "bat"]'
   });
 
   var div = testDiv.appendChild(document.createElement('div'));

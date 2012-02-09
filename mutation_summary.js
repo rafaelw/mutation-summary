@@ -777,26 +777,28 @@
 
     var WHITESPACE = /\s/;
 
-    var OUTSIDE = 0;
+    var BEGIN_TAG_NAME = 0;
     var TAG_NAME = 1;
-    var CLASS_NAME = 2;
-    var BEGIN_ATTR_NAME = 3;
-    var ATTR_NAME = 4;
-    var END_ATTR_NAME = 5;
-    var BEGIN_VALUE = 6;
-    var VALUE = 7;
-    var QUOTED_VALUE = 8;
-    var END_VALUE = 9;
+    var END_TAG_NAME = 2;
+    var CLASS_NAME = 3;
+    var BEGIN_ATTR_NAME = 4;
+    var ATTR_NAME = 5;
+    var END_ATTR_NAME = 6;
+    var BEGIN_VALUE = 7;
+    var VALUE = 8;
+    var QUOTED_VALUE = 9;
+    var END_VALUE = 10;
     var valueQuoteChar;
 
     var SYNTAX_ERROR = 'Invalid element syntax.';
 
-    var state = OUTSIDE;
+    var state = BEGIN_TAG_NAME;
     var i = 0;
+
     while (i < elementFilter.length) {
       var c = elementFilter[i++];
       switch (state) {
-        case OUTSIDE:
+        case BEGIN_TAG_NAME:
           if (c.match(validNameInitialChar)) {
             current = {
               tagName: c
@@ -838,12 +840,27 @@
             state = BEGIN_ATTR_NAME;
             break;
           }
-          if (c.match(WHITESPACE)) {
+          if (c == ',') {
             patterns.push(current);
             current = undefined;
-            state = OUTSIDE;
+            state = BEGIN_TAG_NAME;
             break;
           }
+          if (c.match(WHITESPACE)) {
+            state = END_TAG_NAME;
+            break;
+          }
+
+          throw Error(SYNTAX_ERROR);
+        case END_TAG_NAME:
+          if (c == ',') {
+            patterns.push(current);
+            current = undefined;
+            state = BEGIN_TAG_NAME;
+            break
+          }
+          if (c.match(WHITESPACE))
+            break;
 
           throw Error(SYNTAX_ERROR);
 
@@ -853,10 +870,14 @@
             break;
           }
           if (c.match(WHITESPACE)) {
+            state = END_TAG_NAME;
+            break;
+          }
+          if (c == ',') {
             patterns.push(current);
             current = undefined;
-            state = OUTSIDE;
-            break;
+            state = BEGIN_TAG_NAME;
+            break
           }
 
           throw Error(SYNTAX_ERROR);
@@ -887,9 +908,7 @@
             break;
           }
           if (c == ']') {
-            patterns.push(current);
-            current = undefined;
-            state = OUTSIDE;
+            state = END_TAG_NAME;
             break;
           }
 
@@ -897,9 +916,7 @@
 
         case END_ATTR_NAME:
           if (c == ']') {
-            patterns.push(current);
-            current = undefined;
-            state = OUTSIDE;
+            state = END_TAG_NAME;
             break;
           }
           if (c == '=') {
@@ -931,9 +948,7 @@
             break;
           }
           if (c == ']') {
-            patterns.push(current);
-            current = undefined;
-            state = OUTSIDE;
+            state = END_TAG_NAME;
             break;
           }
           current.attrValue += c;
@@ -954,7 +969,7 @@
           if (c == ']') {
             patterns.push(current);
             current = undefined;
-            state = OUTSIDE;
+            state = END_TAG_NAME;
             break;
           }
           if (c.match(WHITESPACE)) {
@@ -967,7 +982,7 @@
     }
 
     if (current) {
-      if ((state == TAG_NAME) || (state == CLASS_NAME && current.className.length))
+      if ((state == TAG_NAME) || (state == END_TAG_NAME) || (state == CLASS_NAME && current.className.length))
         patterns.push(current);
       else
         throw Error(SYNTAX_ERROR);
@@ -1313,5 +1328,6 @@
 
   // Externs
   global.MutationSummary = MutationSummary;
-  global.MutationSummary.NodeMap = NodeMap;
+  global.MutationSummary.NodeMap = NodeMap; // exposed for use in TreeMirror.
+  global.MutationSummary.parseElementFilter = parseElementFilter; // exposed for testing.
 })(this);
