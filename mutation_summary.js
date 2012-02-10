@@ -502,55 +502,45 @@
         if (result !== undefined)
           return result;
 
-        var attributeOldValues;
-        var change = self.changeMap.get(el);
-        if (change && change.attributeOldValues)
-          attributeOldValues = change.attributeOldValues;
-        else
-          attributeOldValues = {};
-
-        function checkMatch(attrValue, classAttrValue) {
-          if (filter.tagName != '*' && filter.tagName != el.tagName)
-            return false;
-
-          if (filter.attrName) {
-            if (attrValue == null)
-              return false;
-            if (filter.hasOwnProperty('attrValue') && filter.attrValue != attrValue)
-              return false;
-          }
-
-          if (filter.className) {
-            if (!classAttrValue)
-              return false;
-            var retval = classAttrValue.split(' ').some(function(cn) {
-              return cn == filter.className;
-            });
-            return retval;
-          }
-
-          return true;
-        }
-
-        var attrValue = filter.attrName ? el.getAttribute(filter.attrName) : undefined;
-        var classAttrValue = filter.className ? el.getAttribute('class') : undefined;
-
-        var isMatching = checkMatch(attrValue, classAttrValue);
+        var isMatching = el.webkitMatchesSelector(filter.name);
         var wasMatching = isMatching;
 
-        // TODO(rafaelw): This will break if attrName is '__proto__'. The only fix is
-        // to prefix all attributeNames here so that they don't collide with __proto__.
-        // which doesn't seem worth it.
-        if (filter.attrName && hasOwnProperty(attributeOldValues, filter.attrName)) {
-          wasMatching = undefined;
-          attrValue = attributeOldValues[filter.attrName];
+        var change = self.changeMap.get(el);
+        if (change && change.attributeOldValues) {
+          var attributeOldValues = change.attributeOldValues;
+          var checkWasWatching = filter.qualifiers.some(function(qualifier) {
+            return hasOwnProperty(attributeOldValues, qualifier.attrName);
+          });
+
+          wasMatching = function checkWasMatching() {
+            if (filter.tagName != '*' && filter.tagName != el.tagName)
+              return false;
+
+            for (var i = 0; i < filter.qualifiers.length; i++) {
+              var qualifier = filter.qualifiers[i];
+              var attrName = qualifier.attrName;
+              var attrOldValue = hasOwnProperty(attributeOldValues, attrName) ?
+                  attributeOldValues[qualifier.attrName] : el.getAttribute(attrName);
+
+              if (attrOldValue == null)
+                return false;
+
+              if (qualifier.hasOwnProperty('attrValue')) {
+                if (!qualifier.contains && qualifier.attrValue !== attrOldValue)
+                  return false;
+
+                var subvalueMatch = attrOldValue.split(' ').some(function(subValue) {
+                  return subValue == qualifier.attrValue;
+                });
+
+                if (!subvalueMatch)
+                  return false;
+              }
+            }
+
+            return true;
+          }();
         }
-        if (filter.className && attributeOldValues.hasOwnProperty('class')) {
-          wasMatching = undefined;
-          classAttrValue = attributeOldValues['class'];
-        }
-        if (wasMatching === undefined)
-          wasMatching = checkMatch(attrValue, classAttrValue);
 
         if (isMatching)
           result = wasMatching ? STAYED_IN : ENTERED;
@@ -766,246 +756,409 @@
     }
   }
 
-  var validNameInitialChar = /[a-zA-Z:_]+/;
-  var validNameNonInitialChar = /[a-zA-Z0-9_\-:\.]+/;
+  // TODO(rafaelw): Allow ':' and '.' as valid name characters.
+  var validNameInitialChar = /[a-zA-Z_]+/;
+  var validNameNonInitialChar = /[a-zA-Z0-9_\-]+/;
 
   // TODO(rafaelw): Consider allowing backslash in the attrValue.
+  // TODO(rafaelw): There's got a to be way to represent this state machine
+  // more compactly???
   function parseElementFilter(elementFilter) {
-    var patterns = [];
-    var current;
-    var index = 0;
+    var selectorGroup = [];
+    var currentSelector;
+    var currentQualifier;
+
+    function newSelector() {
+      if (currentSelector) {
+        if (currentQualifier) {
+          currentSelector.qualifiers.push(currentQualifier);
+          currentQualifier = undefined;
+        }
+
+        selectorGroup.push(currentSelector);
+      }
+      currentSelector = {
+        qualifiers: []
+      }
+    }
+
+    function newQualifier() {
+      if (currentQualifier)
+        currentSelector.qualifiers.push(currentQualifier);
+
+      currentQualifier = {};
+    }
+
 
     var WHITESPACE = /\s/;
-
-    var BEGIN_TAG_NAME = 0;
-    var TAG_NAME = 1;
-    var END_TAG_NAME = 2;
-    var CLASS_NAME = 3;
-    var BEGIN_ATTR_NAME = 4;
-    var ATTR_NAME = 5;
-    var END_ATTR_NAME = 6;
-    var BEGIN_VALUE = 7;
-    var VALUE = 8;
-    var QUOTED_VALUE = 9;
-    var END_VALUE = 10;
     var valueQuoteChar;
+    var SYNTAX_ERROR = 'Invalid or unsupported selector syntax.';
 
-    var SYNTAX_ERROR = 'Invalid element syntax.';
+    var SELECTOR = 1;
+    var TAG_NAME = 2;
+    var QUALIFIER = 3;
+    var QUALIFIER_NAME_FIRST_CHAR = 4;
+    var QUALIFIER_NAME = 5;
+    var ATTR_NAME_FIRST_CHAR = 6;
+    var ATTR_NAME = 7;
+    var EQUIV_OR_ATTR_QUAL_END = 8;
+    var EQUAL = 9;
+    var ATTR_QUAL_END = 10;
+    var VALUE_FIRST_CHAR = 11;
+    var VALUE = 12;
+    var QUOTED_VALUE = 13;
+    var SELECTOR_SEPARATOR = 14;
 
-    var state = BEGIN_TAG_NAME;
+    var state = SELECTOR;
     var i = 0;
-
     while (i < elementFilter.length) {
       var c = elementFilter[i++];
+
       switch (state) {
-        case BEGIN_TAG_NAME:
+        case SELECTOR:
           if (c.match(validNameInitialChar)) {
-            current = {
-              tagName: c
-            };
+            newSelector();
+            currentSelector.tagName = c;
             state = TAG_NAME;
             break;
           }
+
           if (c == '*') {
-            current = {
-              tagName: '*'
-            };
-            state = TAG_NAME;
+            newSelector();
+            currentSelector.tagName = '*';
+            state = QUALIFIER;
             break;
           }
+
           if (c == '.') {
-            current = {
-              tagName: '*',
-              className: ''
-            };
-            state = CLASS_NAME;
+            newSelector();
+            newQualifier();
+            currentSelector.tagName = '*';
+            currentQualifier.attrName = 'class';
+            currentQualifier.contains = true;
+            state = QUALIFIER_NAME_FIRST_CHAR;
             break;
           }
+          if (c == '#') {
+            newSelector();
+            newQualifier();
+            currentSelector.tagName = '*';
+            currentQualifier.attrName = 'id';
+            state = QUALIFIER_NAME_FIRST_CHAR;
+            break;
+          }
+          if (c == '[') {
+            newSelector();
+            newQualifier();
+            currentSelector.tagName = '*';
+            currentQualifier.attrName = '';
+            state = ATTR_NAME_FIRST_CHAR;
+            break;
+          }
+
           if (c.match(WHITESPACE))
             break;
 
           throw Error(SYNTAX_ERROR);
 
         case TAG_NAME:
-          if (c == '.') {
-            current.className = '';
-            state = CLASS_NAME;
+          if (c.match(validNameNonInitialChar)) {
+            currentSelector.tagName += c;
             break;
           }
-          if (c.match(validNameNonInitialChar) && current.tagName != '*') {
-            current.tagName += c;
+
+          if (c == '.') {
+            newQualifier();
+            currentQualifier.attrName = 'class';
+            currentQualifier.contains = true;
+            state = QUALIFIER_NAME_FIRST_CHAR;
+            break;
+          }
+          if (c == '#') {
+            newQualifier();
+            currentQualifier.attrName = 'id';
+            state = QUALIFIER_NAME_FIRST_CHAR;
             break;
           }
           if (c == '[') {
-            state = BEGIN_ATTR_NAME;
+            newQualifier();
+            currentQualifier.attrName = '';
+            state = ATTR_NAME_FIRST_CHAR;
             break;
           }
-          if (c == ',') {
-            patterns.push(current);
-            current = undefined;
-            state = BEGIN_TAG_NAME;
-            break;
-          }
+
           if (c.match(WHITESPACE)) {
-            state = END_TAG_NAME;
+            state = SELECTOR_SEPARATOR;
             break;
           }
 
-          throw Error(SYNTAX_ERROR);
-        case END_TAG_NAME:
           if (c == ',') {
-            patterns.push(current);
-            current = undefined;
-            state = BEGIN_TAG_NAME;
-            break
-          }
-          if (c.match(WHITESPACE))
+            state = SELECTOR;
             break;
+          }
 
           throw Error(SYNTAX_ERROR);
 
-        case CLASS_NAME:
-          if (c.match(validNameNonInitialChar)) {
-            current.className += c;
+        case QUALIFIER:
+          if (c == '.') {
+            newQualifier();
+            currentQualifier.attrName = 'class';
+            currentQualifier.contains = true;
+            state = QUALIFIER_NAME_FIRST_CHAR;
             break;
           }
+          if (c == '#') {
+            newQualifier();
+            currentQualifier.attrName = 'id';
+            state = QUALIFIER_NAME_FIRST_CHAR;
+            break;
+          }
+          if (c == '[') {
+            newQualifier();
+            currentQualifier.attrName = '';
+            state = ATTR_NAME_FIRST_CHAR;
+            break;
+          }
+
           if (c.match(WHITESPACE)) {
-            state = END_TAG_NAME;
+            state = SELECTOR_SEPARATOR;
             break;
           }
+
           if (c == ',') {
-            patterns.push(current);
-            current = undefined;
-            state = BEGIN_TAG_NAME;
-            break
+            state = SELECTOR;
+            break;
           }
 
           throw Error(SYNTAX_ERROR);
 
-        case BEGIN_ATTR_NAME:
-          if (c.match(WHITESPACE))
-            break;
-
+        case QUALIFIER_NAME_FIRST_CHAR:
           if (c.match(validNameInitialChar)) {
-            state = ATTR_NAME;
-            current.attrName = c;
+            currentQualifier.attrValue = c;
+            state = QUALIFIER_NAME;
             break;
           }
+
+          throw Error(SYNTAX_ERROR);
+
+        case QUALIFIER_NAME:
+          if (c.match(validNameNonInitialChar)) {
+            currentQualifier.attrValue += c;
+            break;
+          }
+
+          if (c == '.') {
+            newQualifier();
+            currentQualifier.attrName = 'class';
+            currentQualifier.contains = true;
+            state = QUALIFIER_NAME_FIRST_CHAR;
+            break;
+          }
+          if (c == '#') {
+            newQualifier();
+            currentQualifier.attrName = 'id';
+            state = QUALIFIER_NAME_FIRST_CHAR;
+            break;
+          }
+          if (c == '[') {
+            newQualifier();
+            state = ATTR_NAME_FIRST_CHAR;
+            break;
+          }
+
+          if (c.match(WHITESPACE)) {
+            state = SELECTOR_SEPARATOR;
+            break;
+          }
+          if (c == ',') {
+            state = SELECTOR;
+            break
+          }
+
+          throw Error(SYNTAX_ERROR);
+
+        case ATTR_NAME_FIRST_CHAR:
+          if (c.match(validNameInitialChar)) {
+            currentQualifier.attrName = c;
+            state = ATTR_NAME;
+            break;
+          }
+
+          if (c.match(WHITESPACE))
+            break;
 
           throw Error(SYNTAX_ERROR);
 
         case ATTR_NAME:
           if (c.match(validNameNonInitialChar)) {
-            current.attrName += c;
+            currentQualifier.attrName += c;
             break;
           }
+
           if (c.match(WHITESPACE)) {
-            state = END_ATTR_NAME;
+            state = EQUIV_OR_ATTR_QUAL_END;
             break;
           }
+
+          if (c == '~') {
+            currentQualifier.contains = true;
+            state = EQUAL;
+            break;
+          }
+
           if (c == '=') {
-            state = BEGIN_VALUE;
+            currentQualifier.attrValue = '';
+            state = VALUE_FIRST_CHAR;
             break;
           }
+
           if (c == ']') {
-            state = END_TAG_NAME;
+            state = QUALIFIER;
             break;
           }
 
           throw Error(SYNTAX_ERROR);
 
-        case END_ATTR_NAME:
-          if (c == ']') {
-            state = END_TAG_NAME;
+        case EQUIV_OR_ATTR_QUAL_END:
+          if (c == '~') {
+            currentQualifier.contains = true;
+            state = EQUAL;
             break;
           }
+
           if (c == '=') {
-            state = BEGIN_VALUE;
+            currentQualifier.attrValue = '';
+            state = VALUE_FIRST_CHAR;
             break;
           }
+
+          if (c == ']') {
+            state = QUALIFIER;
+            break;
+          }
+
           if (c.match(WHITESPACE))
             break;
 
           throw Error(SYNTAX_ERROR);
 
-        case BEGIN_VALUE:
+        case EQUAL:
+          if (c == '=') {
+            currentQualifier.attrValue = '';
+            state = VALUE_FIRST_CHAR
+            break;
+          }
+
+          throw Error(SYNTAX_ERROR);
+
+        case ATTR_QUAL_END:
+          if (c == ']') {
+            state = QUALIFIER;
+            break;
+          }
+
+          if (c.match(WHITESPACE))
+            break;
+
+          throw Error(SYNTAX_ERROR);
+
+        case VALUE_FIRST_CHAR:
+          if (c.match(WHITESPACE))
+            break;
+
           if (c == '"' || c == "'") {
             valueQuoteChar = c;
-            current.attrValue = '';
             state = QUOTED_VALUE;
             break;
           }
-          if (c.match(WHITESPACE))
-            break;
 
+          currentQualifier.attrValue += c;
           state = VALUE;
-          current.attrValue = c;
           break;
 
         case VALUE:
           if (c.match(WHITESPACE)) {
-            state = END_VALUE;
+            state = ATTR_QUAL_END;
             break;
           }
           if (c == ']') {
-            state = END_TAG_NAME;
+            state = QUALIFIER;
             break;
           }
-          current.attrValue += c;
+          if (c == "'" || c == '"')
+            throw Error(SYNTAX_ERROR);
+
+          currentQualifier.attrValue += c;
           break;
+
         case QUOTED_VALUE:
-          if (c.match(WHITESPACE)) {
-            current.attrValue += c;
-            break;
-          }
           if (c == valueQuoteChar) {
-            state = END_VALUE;
-            valueQuoteChar = undefined;
+            state = ATTR_QUAL_END;
             break;
           }
-          current.attrValue += c;
+
+          currentQualifier.attrValue += c;
           break;
-        case END_VALUE:
-          if (c == ']') {
-            patterns.push(current);
-            current = undefined;
-            state = END_TAG_NAME;
+
+        case SELECTOR_SEPARATOR:
+          if (c.match(WHITESPACE))
             break;
-          }
-          if (c.match(WHITESPACE)) {
-            break;
+
+          if (c == ',') {
+            state = SELECTOR;
+            break
           }
 
           throw Error(SYNTAX_ERROR);
-          break;
       }
     }
 
-    if (current) {
-      if ((state == TAG_NAME) || (state == END_TAG_NAME) || (state == CLASS_NAME && current.className.length))
-        patterns.push(current);
-      else
+    switch (state) {
+      case SELECTOR:
+      case TAG_NAME:
+      case QUALIFIER:
+      case QUALIFIER_NAME:
+      case SELECTOR_SEPARATOR:
+        // Valid end states.
+        newSelector();
+        break;
+      default:
         throw Error(SYNTAX_ERROR);
     }
 
-    patterns.forEach(function(pattern) {
-      pattern.tagName = pattern.tagName.toUpperCase();
-      pattern.name = pattern.tagName;
-      if (pattern.className) {
-        pattern.name += '.' + pattern.className;
-      }
-      if (pattern.attrName) {
-        pattern.name += '[' + pattern.attrName;
-        if (pattern.hasOwnProperty('attrValue'))
-          pattern.name += '="' + pattern.attrValue.replace(/"/, '\\\"') + '"';
-        pattern.name += ']';
-      }
-    });
-
-    if (!patterns.length)
+    if (!selectorGroup.length)
       throw Error(SYNTAX_ERROR);
 
-    return patterns;
+    function escapeQuotes(value) {
+      return '"' + value.replace(/"/, '\\\"') + '"';
+    }
+
+    selectorGroup.forEach(function(selector) {
+      selector.tagName = selector.tagName.toUpperCase();
+      var name = selector.tagName;
+
+      selector.qualifiers.forEach(function(qualifier) {
+        if (qualifier.contains) {
+          if (qualifier.attrName == 'class')
+            name += '.' + qualifier.attrValue;
+          else
+            name += '[' + qualifier.attrName + '~=' + escapeQuotes(qualifier.attrValue) + ']';
+        } else {
+          if (qualifier.attrName == 'id') {
+            name += '#' + qualifier.attrValue;
+          } else {
+            name += '[' + qualifier.attrName;
+            if (qualifier.hasOwnProperty('attrValue'))
+              name += '=' + escapeQuotes(qualifier.attrValue);
+            name += ']';
+          }
+        }
+      });
+
+      selector.name = name;
+    });
+
+    return selectorGroup;
   }
 
   var attributeFilterPattern = /^([a-zA-Z:_]+[a-zA-Z0-9_\-:\.]*)$/;
@@ -1137,8 +1290,9 @@
     var attributes = {};
 
     filters.forEach(function(filter) {
-      if (filter.attrName)
-        attributes[filter.attrName] = true;
+      filter.qualifiers.forEach(function(qualifier) {
+        attributes[qualifier.attrName] = true;
+      });
     });
 
     return Object.keys(attributes);
