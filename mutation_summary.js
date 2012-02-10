@@ -112,6 +112,9 @@
         this.changeMap.set(node, change);
       }
 
+      if (node.nodeType == Node.ELEMENT_NODE)
+        change.matchCaseInsensitive = node instanceof HTMLElement && node.ownerDocument instanceof HTMLDocument;
+
       return change;
     },
 
@@ -452,6 +455,77 @@
         return getWasReachable(node) ? EXITED : STAYED_OUT;
     },
 
+    checkWasMatching: function(el, filter, isMatching) {
+      var change = this.changeMap.get(el);
+      if (!change || !change.attributeOldValues)
+        return isMatching;
+
+      var tagName = filter.tagName;
+      if (change.matchCaseInsensitive &&
+          tagName != '*' &&
+          hasOwnProperty(filter, 'caseInsensitiveTagName')) {
+        tagName = filter.caseInsensitiveTagName;
+      }
+
+      if (tagName != '*' && tagName != el.tagName)
+        return false;
+
+      var attributeOldValues = change.attributeOldValues;
+      var significantAttrChanged = filter.qualifiers.some(function(qualifier) {
+        if (qualifier.class)
+          return hasOwnProperty(attributeOldValues, 'class');
+        else if (qualifier.id)
+          return hasOwnProperty(attributeOldValues, 'id');
+        else {
+          return change.matchCaseInsensitive && hasOwnProperty(qualifier, 'caseInsensitiveAttrName') ?
+              hasOwnProperty(attributeOldValues, qualifier.caseInsensitiveAttrName) :
+              hasOwnProperty(attributeOldValues, qualifier.attrName)
+        }
+      });
+
+      if (!significantAttrChanged)
+        return isMatching;
+
+      for (var i = 0; i < filter.qualifiers.length; i++) {
+        var qualifier = filter.qualifiers[i];
+        var attrName;
+        if (qualifier.class)
+          attrName = 'class';
+        else if (qualifier.id)
+          attrName = 'id';
+        else {
+          if (change.matchCaseInsensitive &&
+              hasOwnProperty(qualifier, 'caseInsensitiveAttrName')) {
+            attrName = qualifier.caseInsensitiveAttrName;
+          } else {
+            attrName = qualifier.attrName;
+          }
+        }
+
+        var contains = qualifier.class ? true : qualifier.contains;
+
+        var attrOldValue = hasOwnProperty(attributeOldValues, attrName) ?
+            attributeOldValues[attrName] : el.getAttribute(attrName);
+
+        if (attrOldValue == null)
+          return false;
+
+        if (qualifier.hasOwnProperty('attrValue')) {
+          if (!contains && qualifier.attrValue !== attrOldValue)
+            return false;
+
+          var subvalueMatch = attrOldValue.split(' ').some(function(subValue) {
+            return subValue == qualifier.attrValue;
+          });
+
+          if (!subvalueMatch)
+            return false;
+        }
+      }
+
+      return true;
+    },
+
     /**
      * Returns whether a given element:
      *
@@ -488,59 +562,21 @@
       if (node.nodeType !== Node.ELEMENT_NODE)
         return STAYED_OUT;
 
-      var self = this;
       var el = node;
 
       function computeMatchabilityChange(filter) {
-        if (!self.matchCache)
-          self.matchCache = {};
-        if (!self.matchCache[filter.name])
-          self.matchCache[filter.name] = new NodeMap;
+        if (!this.matchCache)
+          this.matchCache = {};
+        if (!this.matchCache[filter.selectorString])
+          this.matchCache[filter.selectorString] = new NodeMap;
 
-        var cache = self.matchCache[filter.name];
+        var cache = this.matchCache[filter.selectorString];
         var result = cache.get(el);
         if (result !== undefined)
           return result;
 
-        var isMatching = el.webkitMatchesSelector(filter.name);
-        var wasMatching = isMatching;
-
-        var change = self.changeMap.get(el);
-        if (change && change.attributeOldValues) {
-          var attributeOldValues = change.attributeOldValues;
-          var checkWasWatching = filter.qualifiers.some(function(qualifier) {
-            return hasOwnProperty(attributeOldValues, qualifier.attrName);
-          });
-
-          wasMatching = function checkWasMatching() {
-            if (filter.tagName != '*' && filter.tagName != el.tagName)
-              return false;
-
-            for (var i = 0; i < filter.qualifiers.length; i++) {
-              var qualifier = filter.qualifiers[i];
-              var attrName = qualifier.attrName;
-              var attrOldValue = hasOwnProperty(attributeOldValues, attrName) ?
-                  attributeOldValues[qualifier.attrName] : el.getAttribute(attrName);
-
-              if (attrOldValue == null)
-                return false;
-
-              if (qualifier.hasOwnProperty('attrValue')) {
-                if (!qualifier.contains && qualifier.attrValue !== attrOldValue)
-                  return false;
-
-                var subvalueMatch = attrOldValue.split(' ').some(function(subValue) {
-                  return subValue == qualifier.attrValue;
-                });
-
-                if (!subvalueMatch)
-                  return false;
-              }
-            }
-
-            return true;
-          }();
-        }
+        var isMatching = el.webkitMatchesSelector(filter.selectorString);
+        var wasMatching = this.checkWasMatching(el, filter, isMatching);
 
         if (isMatching)
           result = wasMatching ? STAYED_IN : ENTERED;
@@ -551,7 +587,7 @@
         return result;
       }
 
-      var matchChanges = this.elementFilter.map(computeMatchabilityChange);
+      var matchChanges = this.elementFilter.map(computeMatchabilityChange, this);
       var accum = STAYED_OUT;
       var i = 0;
 
@@ -834,8 +870,7 @@
             newSelector();
             newQualifier();
             currentSelector.tagName = '*';
-            currentQualifier.attrName = 'class';
-            currentQualifier.contains = true;
+            currentQualifier.class = true;
             state = QUALIFIER_NAME_FIRST_CHAR;
             break;
           }
@@ -843,7 +878,7 @@
             newSelector();
             newQualifier();
             currentSelector.tagName = '*';
-            currentQualifier.attrName = 'id';
+            currentQualifier.id = true;
             state = QUALIFIER_NAME_FIRST_CHAR;
             break;
           }
@@ -869,14 +904,13 @@
 
           if (c == '.') {
             newQualifier();
-            currentQualifier.attrName = 'class';
-            currentQualifier.contains = true;
+            currentQualifier.class = true;
             state = QUALIFIER_NAME_FIRST_CHAR;
             break;
           }
           if (c == '#') {
             newQualifier();
-            currentQualifier.attrName = 'id';
+            currentQualifier.id = true;
             state = QUALIFIER_NAME_FIRST_CHAR;
             break;
           }
@@ -902,14 +936,13 @@
         case QUALIFIER:
           if (c == '.') {
             newQualifier();
-            currentQualifier.attrName = 'class';
-            currentQualifier.contains = true;
+            currentQualifier.class = true;
             state = QUALIFIER_NAME_FIRST_CHAR;
             break;
           }
           if (c == '#') {
             newQualifier();
-            currentQualifier.attrName = 'id';
+            currentQualifier.id = true;
             state = QUALIFIER_NAME_FIRST_CHAR;
             break;
           }
@@ -949,14 +982,13 @@
 
           if (c == '.') {
             newQualifier();
-            currentQualifier.attrName = 'class';
-            currentQualifier.contains = true;
+            currentQualifier.class = true;
             state = QUALIFIER_NAME_FIRST_CHAR;
             break;
           }
           if (c == '#') {
             newQualifier();
-            currentQualifier.attrName = 'id';
+            currentQualifier.id = true;
             state = QUALIFIER_NAME_FIRST_CHAR;
             break;
           }
@@ -1134,28 +1166,34 @@
     }
 
     selectorGroup.forEach(function(selector) {
-      selector.tagName = selector.tagName.toUpperCase();
-      var name = selector.tagName;
+      var caseInsensitiveTagName = selector.tagName.toUpperCase();
+      if (selector.tagName != caseInsensitiveTagName)
+        selector.caseInsensitiveTagName = caseInsensitiveTagName;
+
+      var selectorString = selector.tagName;
 
       selector.qualifiers.forEach(function(qualifier) {
-        if (qualifier.contains) {
-          if (qualifier.attrName == 'class')
-            name += '.' + qualifier.attrValue;
-          else
-            name += '[' + qualifier.attrName + '~=' + escapeQuotes(qualifier.attrValue) + ']';
-        } else {
-          if (qualifier.attrName == 'id') {
-            name += '#' + qualifier.attrValue;
-          } else {
-            name += '[' + qualifier.attrName;
+        if (qualifier.class)
+          selectorString += '.' + qualifier.attrValue;
+        else if (qualifier.id)
+          selectorString += '#' + qualifier.attrValue;
+        else {
+          var caseInsensitiveAttrName = qualifier.attrName.toLowerCase();
+          if (qualifier.attrName != caseInsensitiveAttrName)
+            qualifier.caseInsensitiveAttrName = caseInsensitiveAttrName;
+
+          if (qualifier.contains)
+            selectorString += '[' + qualifier.attrName + '~=' + escapeQuotes(qualifier.attrValue) + ']';
+          else {
+            selectorString += '[' + qualifier.attrName;
             if (qualifier.hasOwnProperty('attrValue'))
-              name += '=' + escapeQuotes(qualifier.attrValue);
-            name += ']';
+              selectorString += '=' + escapeQuotes(qualifier.attrValue);
+            selectorString += ']';
           }
         }
       });
 
-      selector.name = name;
+      selector.selectorString = selectorString;
     });
 
     return selectorGroup;
@@ -1291,7 +1329,12 @@
 
     filters.forEach(function(filter) {
       filter.qualifiers.forEach(function(qualifier) {
-        attributes[qualifier.attrName] = true;
+        if (qualifier.class)
+          attributes['class'] = true;
+        else if (qualifier.id)
+          attributes['id'] = true;
+        else
+          attributes[qualifier.attrName] = true;
       });
     });
 

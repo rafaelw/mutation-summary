@@ -222,25 +222,25 @@ function assertNothingReported() {
   return promise;
 }
 
-function assertSelectorNames(selectors, expectNames) {
-  assertEquals(expectNames.length, selectors.length);
-  expectNames.forEach(function(name, i) {
-    assertEquals(name, selectors[i].name);
+function assertSelectorNames(selectors, expectSelectorStrings) {
+  assertEquals(expectSelectorStrings.length, selectors.length);
+  expectSelectorStrings.forEach(function(expectSelectorString, i) {
+    assertEquals(expectSelectorString, selectors[i].selectorString);
   });
 }
 
 function testParseElementFilter() {
   assertSelectorNames(MutationSummary.parseElementFilter('div'),
-                      ['DIV']);
+                      ['div']);
 
   assertSelectorNames(MutationSummary.parseElementFilter(' div '),
-                      ['DIV']);
+                      ['div']);
 
   assertSelectorNames(MutationSummary.parseElementFilter('div,span'),
-                      ['DIV', 'SPAN']);
+                      ['div', 'span']);
 
-  assertSelectorNames(MutationSummary.parseElementFilter(' div , span '),
-                      ['DIV', 'SPAN']);
+  assertSelectorNames(MutationSummary.parseElementFilter(' div , SPAN '),
+                      ['div', 'SPAN']);
 
   assertThrows(function() {
     MutationSummary.parseElementFilter('div span');
@@ -266,13 +266,13 @@ function testParseElementFilter() {
                       ['*#id']);
 
   assertSelectorNames(MutationSummary.parseElementFilter('span#id'),
-                      ['SPAN#id']);
+                      ['span#id']);
 
-  assertSelectorNames(MutationSummary.parseElementFilter('span#id1#id2'),
+  assertSelectorNames(MutationSummary.parseElementFilter('SPAN#id1#id2'),
                       ['SPAN#id1#id2']);
 
   assertSelectorNames(MutationSummary.parseElementFilter('span, #id'),
-                      ['SPAN', '*#id']);
+                      ['span', '*#id']);
 
   assertThrows(function() {
     MutationSummary.parseElementFilter('#2foo');
@@ -289,13 +289,13 @@ function testParseElementFilter() {
                       ['*.className.className2']);
 
   assertSelectorNames(MutationSummary.parseElementFilter('div.className'),
-                      ['DIV.className']);
+                      ['div.className']);
 
-  assertSelectorNames(MutationSummary.parseElementFilter('div.className.className2'),
+  assertSelectorNames(MutationSummary.parseElementFilter('DIV.className.className2'),
                       ['DIV.className.className2']);
 
   assertSelectorNames(MutationSummary.parseElementFilter(' div.className '),
-                      ['DIV.className']);
+                      ['div.className']);
 
   assertSelectorNames(MutationSummary.parseElementFilter('.className'),
                       ['*.className']);
@@ -304,9 +304,9 @@ function testParseElementFilter() {
                       ['*.className']);
 
   assertSelectorNames(MutationSummary.parseElementFilter('.className,.className,span.className'),
-                      ['*.className', '*.className', 'SPAN.className']);
+                      ['*.className', '*.className', 'span.className']);
 
-  assertSelectorNames(MutationSummary.parseElementFilter(' .className, .className, span.className'),
+  assertSelectorNames(MutationSummary.parseElementFilter(' .className, .className, SPAN.className'),
                       ['*.className', '*.className', 'SPAN.className']);
 
   assertThrows(function() {
@@ -326,28 +326,28 @@ function testParseElementFilter() {
   })
 
   assertSelectorNames(MutationSummary.parseElementFilter('div[foo].className'),
-                      ['DIV[foo].className']);
+                      ['div[foo].className']);
 
-  assertSelectorNames(MutationSummary.parseElementFilter('div[foo].className#id'),
+  assertSelectorNames(MutationSummary.parseElementFilter('DIV[foo].className#id'),
                       ['DIV[foo].className#id']);
 
   assertSelectorNames(MutationSummary.parseElementFilter('div#id.className[foo]'),
-                      ['DIV#id.className[foo]']);
+                      ['div#id.className[foo]']);
 
   assertSelectorNames(MutationSummary.parseElementFilter('div[foo]'),
-                      ['DIV[foo]']);
+                      ['div[foo]']);
 
   assertSelectorNames(MutationSummary.parseElementFilter('div[ foo ]'),
-                      ['DIV[foo]']);
+                      ['div[foo]']);
 
   assertSelectorNames(MutationSummary.parseElementFilter(' div[ foo ] '),
-                      ['DIV[foo]']);
+                      ['div[foo]']);
 
   assertSelectorNames(MutationSummary.parseElementFilter('div[foo],span[bar]'),
-                      ['DIV[foo]', 'SPAN[bar]']);
+                      ['div[foo]', 'span[bar]']);
 
   assertSelectorNames(MutationSummary.parseElementFilter(' div[foo] , span[bar] '),
-                      ['DIV[foo]', 'SPAN[bar]']);
+                      ['div[foo]', 'span[bar]']);
 
   assertSelectorNames(MutationSummary.parseElementFilter('[foo]'),
                       ['*[foo]']);
@@ -366,19 +366,19 @@ function testParseElementFilter() {
   })
 
   assertSelectorNames(MutationSummary.parseElementFilter('div[foo=bar]'),
-                      ['DIV[foo="bar"]']);
+                      ['div[foo="bar"]']);
 
   assertSelectorNames(MutationSummary.parseElementFilter('div[ foo=" bar baz " ]'),
-                      ['DIV[foo=" bar baz "]']);
+                      ['div[foo=" bar baz "]']);
 
   assertSelectorNames(MutationSummary.parseElementFilter(' div[ foo = \' bar baz \'] '),
-                      ['DIV[foo=" bar baz "]']);
+                      ['div[foo=" bar baz "]']);
 
   assertSelectorNames(MutationSummary.parseElementFilter('div[foo=baz],span[bar="bat"]'),
-                      ['DIV[foo="baz"]', 'SPAN[bar="bat"]']);
+                      ['div[foo="baz"]', 'span[bar="bat"]']);
 
   assertSelectorNames(MutationSummary.parseElementFilter(' div[foo=boo] , span[bar="baz"] '),
-                      ['DIV[foo="boo"]', 'SPAN[bar="baz"]']);
+                      ['div[foo="boo"]', 'span[bar="baz"]']);
 
   assertThrows(function() {
     MutationSummary.parseElementFilter('div[foo="bar ]');
@@ -397,10 +397,10 @@ function testParseElementFilter() {
   })
 
   assertSelectorNames(MutationSummary.parseElementFilter('div[foo~=bar]'),
-                      ['DIV[foo~="bar"]']);
+                      ['div[foo~="bar"]']);
 
   assertSelectorNames(MutationSummary.parseElementFilter('div[foo~="bar  "]'),
-                      ['DIV[foo~="bar  "]']);
+                      ['div[foo~="bar  "]']);
 
   assertThrows(function() {
     MutationSummary.parseElementFilter('div[foo~=]');
@@ -410,10 +410,10 @@ function testParseElementFilter() {
   })
 
   assertSelectorNames(MutationSummary.parseElementFilter('div[foo][bar]'),
-                      ['DIV[foo][bar]']);
+                      ['div[foo][bar]']);
 
   assertSelectorNames(MutationSummary.parseElementFilter('div[foo], A, *[bar], div[ baz = "bat"]'),
-                      ['DIV[foo]', 'A', '*[bar]', 'DIV[baz="bat"]']);
+                      ['div[foo]', 'A', '*[bar]', 'div[baz="bat"]']);
 }
 
 function testOptionsValidation() {
@@ -705,7 +705,6 @@ function testElementFilterAttributeSpecified() {
   });
 
   var div = testDiv.appendChild(document.createElement('div'));
-  div.id = 'div1';
   div.setAttribute('foo', 'foo');
   var div2 = testDiv.appendChild(document.createElement('div'));
   div2.setAttribute('fooz', 'foo');
@@ -726,6 +725,92 @@ function testElementFilterAttributeSpecified() {
 
     assertElementChanges([p, div3, span], [], undefined, undefined, [div]).then(function() {
 
+      div3.removeAttribute('baz');
+      div3.setAttribute('baz', 'bat');
+
+      assertNothingReported().then(continueTesting);
+    });
+  });
+}
+
+function testElementFilterHTMLCaseInsensitive() {
+  testCase.waitForAsync();
+
+  startObserving({
+    element: 'DIV[foo], A, *[bar], div[ BaZ = "bat"], span#foo[Blow~=blarg]',
+    elementAttributes: 'foo FOO'
+  });
+
+  var div = testDiv.appendChild(document.createElement('div'));
+  div.setAttribute('FOO', 'foo');
+  var div2 = testDiv.appendChild(document.createElement('div'));
+  div2.setAttribute('fooz', 'foo');
+  var div3 = testDiv.appendChild(document.createElement('div'));
+  div3.setAttribute('baz', 'fat');
+
+  var span = div.appendChild(document.createElement('span'));
+  var p = testDiv.appendChild(document.createElement('P'));
+  p.setAttribute('baz', 'baz');
+
+  assertElementChanges([div], [], {}, {}, []).then(function() {
+    div.setAttribute('foo', 'blarg');
+
+    p.removeAttribute('baz');
+    p.setAttribute('bar', 'bar');
+    div3.setAttribute('baz', 'bat');
+    span.id = 'foo';
+    span.setAttribute('bloW', 'blarg bloog');
+
+    assertElementChanges([p, div3, span], [], {'foo': [div]}, {'foo': ['foo']}, []).then(function() {
+
+      div3.removeAttribute('baz');
+      div3.setAttribute('baz', 'bat');
+
+      assertNothingReported().then(continueTesting);
+    });
+  });
+}
+
+function testElementFilterSVGCaseSensitive() {
+  testCase.waitForAsync();
+
+  var svgDoc = document.implementation.createDocument('http://www.w3.org/2000/svg', 'svg', 'svg');
+  testDiv = svgDoc.createElement('div');
+
+  startObserving({
+    element: 'div[foo], a, *[bar], div[ BaZ = "bat"], SPAN#foo[Blow~=blarg]',
+    elementAttributes: 'foo FOO'
+  });
+
+  var div = testDiv.appendChild(svgDoc.createElement('div'));
+  div.setAttribute('FOO', 'foo');
+
+  var div2 = testDiv.appendChild(svgDoc.createElement('div'));
+  div2.setAttribute('foo', 'foo');
+
+  var div3 = testDiv.appendChild(svgDoc.createElement('div'));
+  div3.setAttribute('baz', 'fat');
+
+  var span = div.appendChild(svgDoc.createElement('span'));
+  var upperSpan = div.appendChild(svgDoc.createElement('SPAN'));
+  var p = testDiv.appendChild(svgDoc.createElement('P'));
+  p.setAttribute('bar', 'baz');
+
+  assertElementChanges([div2, p], [], {}, {}, []).then(function() {
+    div2.setAttribute('foo', 'bar');
+    div2.setAttribute('FOO', 'bar');
+
+    p.removeAttribute('bar');
+    p.setAttribute('BAR', 'bar');
+
+    div3.setAttribute('BaZ', 'bat');
+
+    // Note: SVG Elements aren't HTMLElements, so el.id doesn't delegate to the 'id' attribute.
+    upperSpan.setAttribute('id', 'foo');
+    upperSpan.setAttribute('Blow', 'blarg bloog');
+
+    assertElementChanges([div3, upperSpan], [],
+        {'foo': [div2], 'FOO': [div2]}, {'foo':['foo'], 'FOO': [null]}, [p]).then(function() {
       div3.removeAttribute('baz');
       div3.setAttribute('baz', 'bat');
 

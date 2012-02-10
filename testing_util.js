@@ -79,7 +79,7 @@ MutationSummary.createQueryValidator = function(root, query) {
       if (node.nodeType != Node.ELEMENT_NODE)
         return false;
       return query.elementFilter.some(function(pattern) {
-        return node.webkitMatchesSelector(pattern.name);
+        return node.webkitMatchesSelector(pattern.selectorString);
       });
     }
 
