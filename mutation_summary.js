@@ -386,9 +386,6 @@
      *   wasReachable(node)
      *   isReachable(node)
      *
-     *
-     * Complexity: O(log n)
-     *   n: The number of nodes in the fragment.
      */
     reachabilityChange: function(node) {
       this.reachableCache = this.reachableCache || new NodeMap;
@@ -538,8 +535,6 @@
      *   wasMatching(node)
      *   isMatching(node)
      *
-     *
-     * Complexity: O(1)
      */
     matchabilityChange: function(node) {
       // TODO(rafaelw): Include PI, CDATA?
@@ -616,20 +611,6 @@
       return accum;
     },
 
-    /**
-     * Preprocessing step required for getReordered. This builds a set of
-     * records, one for each parent which had nodes removed or added, and builds
-     *   -A map of the nodes which were added
-     *   -A map of the nodes which were removed
-     *   -A map of the nodes which were "maybe moved" (removed and added back).
-     *   -A map of node->old previous node (the previousSibling of the node when
-     *    observation)
-     *
-     * Complexity: O(a)
-     *   a: The number of node removals and additions which have occurred.
-     *
-     * See getReordered, below.
-     */
     processChildlistChanges: function() {
       if (this.childlistChanges)
         return;
