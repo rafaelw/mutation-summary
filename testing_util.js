@@ -84,6 +84,10 @@ MutationSummary.createQueryValidator = function(root, query) {
     }
 
     function elementData(node) {
+
+      var caseInsensitive = node instanceof HTMLElement &&
+                            node.ownerDocument instanceof HTMLDocument;
+
       var data = {
         parentNode: node.parentNode
       };
@@ -93,6 +97,9 @@ MutationSummary.createQueryValidator = function(root, query) {
 
       data.attributes = {};
       query.elementAttributes.forEach(function(attrName) {
+        if (caseInsensitive)
+          attrName = attrName.toLowerCase();
+
         data.attributes[attrName] = node.getAttribute(attrName);
       });
 
@@ -101,6 +108,11 @@ MutationSummary.createQueryValidator = function(root, query) {
 
     function elementValidator(summary, stayed, old, current) {
       var attributeChanged = {};
+      if (query.elementAttributes) {
+        query.elementAttributes.forEach(function(attrName) {
+          attributeChanged[attrName] = [];
+        });
+      }
       var reparented = [];
 
       stayed.forEach(function(node) {
@@ -114,10 +126,8 @@ MutationSummary.createQueryValidator = function(root, query) {
           return;
 
         query.elementAttributes.forEach(function(attrName) {
-          if (oldData.attributes[attrName] != data.attributes[attrName]) {
-            attributeChanged[attrName] = attributeChanged[attrName] || [];
+          if (oldData.attributes[attrName] != data.attributes[attrName])
             attributeChanged[attrName].push(node);
-          }
         });
       });
 

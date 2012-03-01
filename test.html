@@ -132,12 +132,15 @@ function assertElementChanges(expectAdded,
   resetChanged();
 
   setTimeout(function() {
+    assertFalse(changed.hasOwnProperty('reordered'));
     compareNodeArrayIgnoreOrder(expectAdded, changed.added);
     compareNodeArrayIgnoreOrder(expectRemoved, changed.removed);
     compareNodeArrayIgnoreOrder(expectReparented, changed.reparented);
 
     assert(typeof expectChangedNodes === typeof changed.attributeChanged);
     if (expectChangedNodes) {
+      assertEquals(Object.keys(expectChangedNodes).length, Object.keys(changed.attributeChanged).length);
+
       Object.keys(expectChangedNodes).forEach(function(attrName) {
         compareNodeArrayIgnoreOrder(expectChangedNodes[attrName], changed.attributeChanged[attrName]);
         expectOldValues[attrName].forEach(function(attrOldValue, index) {
@@ -162,6 +165,8 @@ function assertAttributeChanges(expectAddedNodes, expectChangedNodes, expectOldV
   resetChanged();
 
   setTimeout(function() {
+    assertFalse(changed.hasOwnProperty('reparented'));
+    assertFalse(changed.hasOwnProperty('reordered'));
     compareNodeArrayIgnoreOrder(expectAddedNodes, changed.added);
     compareNodeArrayIgnoreOrder(expectChangedNodes, changed.valueChanged);
     compareNodeArrayIgnoreOrder(expectRemovedNodes, changed.removed);
@@ -752,7 +757,7 @@ function testElementFilterHTMLCaseInsensitive() {
   var p = testDiv.appendChild(document.createElement('P'));
   p.setAttribute('baz', 'baz');
 
-  assertElementChanges([div], [], {}, {}, []).then(function() {
+  assertElementChanges([div], [], {'foo': [], 'FOO': []}, {'foo':[], 'FOO':[]}, []).then(function() {
     div.setAttribute('foo', 'blarg');
 
     p.removeAttribute('baz');
@@ -761,7 +766,7 @@ function testElementFilterHTMLCaseInsensitive() {
     span.id = 'foo';
     span.setAttribute('bloW', 'blarg bloog');
 
-    assertElementChanges([p, div3, span], [], {'foo': [div]}, {'foo': ['foo']}, []).then(function() {
+    assertElementChanges([p, div3, span], [], {'foo': [div], 'FOO':[]}, {'foo': ['foo'], 'FOO':[]}, []).then(function() {
 
       div3.removeAttribute('baz');
       div3.setAttribute('baz', 'bat');
@@ -796,7 +801,7 @@ function testElementFilterSVGCaseSensitive() {
   var p = testDiv.appendChild(svgDoc.createElement('P'));
   p.setAttribute('bar', 'baz');
 
-  assertElementChanges([div2, p], [], {}, {}, []).then(function() {
+  assertElementChanges([div2, p], [], {'foo':[], 'FOO':[]}, {'foo':[], 'FOO':[]}, []).then(function() {
     div2.setAttribute('foo', 'bar');
     div2.setAttribute('FOO', 'bar');
 
@@ -846,12 +851,12 @@ function testElementFilterWithElementAttributes() {
   div3.setAttribute('baz', 'bar');
   div2.appendChild(div);
 
-  assertElementChanges([div2, div3], [div], { 'foo': [div] }, { 'foo': ['bar'] }, []).then(function() {
+  assertElementChanges([div2, div3], [div], { 'foo': [div], 'boo': [] }, { 'foo': ['bar'], 'boo':[] }, []).then(function() {
     testDiv.appendChild(div);
     div3.removeAttribute('baz');
     testDiv.removeChild(div2);
 
-    assertElementChanges([], [div], {}, {}, [div2, div3]).then(function() {
+    assertElementChanges([], [div], {'foo':[], 'boo':[]}, {'foo':[], 'boo':[]}, [div2, div3]).then(function() {
       div.setAttribute('foo', 'baz');
       div.setAttribute('foo', 'bar2');
 

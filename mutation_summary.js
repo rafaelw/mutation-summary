@@ -1390,10 +1390,15 @@
       target: root,
       type: 'summary',
       added: [],
-      removed: [],
-      reparented: query.all || query.element ? [] : undefined,
-      reordered: query.all ? [] : undefined
+      removed: []
     };
+
+
+    if (query.all || query.element)
+      summary.reparented = [];
+
+    if (query.all)
+      summary.reordered = [];
 
     projection.getChanged(summary);
 
@@ -1410,6 +1415,12 @@
         }
       } else {
         summary.attributeChanged = attributeChanged;
+        if (query.elementAttributes) {
+          query.elementAttributes.forEach(function(attrName) {
+            if (!summary.attributeChanged.hasOwnProperty(attrName))
+              summary.attributeChanged[attrName] = [];
+          });
+        }
         summary.getOldAttribute = projection.getOldAttribute.bind(projection);
       }
     }
