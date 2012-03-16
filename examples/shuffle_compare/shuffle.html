@@ -87,6 +87,8 @@ function prepReport() {
 }
 
 function setupWatch() {
+  var MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
+
   switch(watchType) {
     case 'event':
       document.removeEventListener('DOMNodeInserted', mutationEventIsFiring);
@@ -107,20 +109,20 @@ function setupWatch() {
       document.addEventListener('DOMNodeInserted', mutationEventIsFiring);
       document.addEventListener('DOMNodeRemoved', mutationEventIsFiring);
       window.report = function() {
-        document.getElementById('report').innerText = changeCount + ' events fired';
+        document.getElementById('report').textContent = changeCount + ' events fired';
       }
       break;
     case 'observer':
-      observer = new WebKitMutationObserver(observeMutations);
+      observer = new MutationObserver(observeMutations);
       observer.observe(document, { childList: true, subtree: true});
       window.report = function() {
-        document.getElementById('report').innerText = changeCount + ' mutations reported in ' + callbacks + ' callbacks';
+        document.getElementById('report').textContent = changeCount + ' mutations reported in ' + callbacks + ' callbacks';
       }
       break;
     case 'summary':
       observerSummary = new MutationSummary({ callback: handleSummary, queries: [{ all: true }]});
       window.report = function() {
-        document.getElementById('report').innerText = changeCount + ' reorders reported in ' + callbacks + ' callbacks';
+        document.getElementById('report').textContent = changeCount + ' reorders reported in ' + callbacks + ' callbacks';
       }
       break;
   }

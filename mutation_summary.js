@@ -16,6 +16,14 @@
 
   "use strict";
 
+  var matchesSelector = 'matchesSelector';
+  if ('webkitMatchesSelector' in Element.prototype)
+    matchesSelector = 'webkitMatchesSelector';
+  else if ('mozMatchesSelector' in Element.prototype)
+    matchesSelector = 'mozMatchesSelector';
+
+  var MutationObserver = global.MutationObserver || global.WebKitMutationObserver || global.MozMutationObserver;
+
   // NodeMap UtilityClass. Exposed as MutationSummary.NodeMap.
   // TODO(rafaelw): Consider using Harmony Map when available.
 
@@ -570,7 +578,7 @@
         if (result !== undefined)
           return result;
 
-        var isMatching = el.webkitMatchesSelector(filter.selectorString);
+        var isMatching = el[matchesSelector](filter.selectorString);
         var wasMatching = this.checkWasMatching(el, filter, isMatching);
 
         if (isMatching)
@@ -1453,7 +1461,7 @@
       });
     }
 
-    var observer = new WebKitMutationObserver(function(mutations) {
+    var observer = new MutationObserver(function(mutations) {
       if (!options.observeOwnChanges) {
         observer.disconnect();
       }

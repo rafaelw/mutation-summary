@@ -26,6 +26,12 @@ function compareNodeArrayIgnoreOrder(expected, actual) {
 }
 
 MutationSummary.createQueryValidator = function(root, query) {
+  var matchesSelector = 'matchesSelector';
+  if ('webkitMatchesSelector' in Element.prototype)
+    matchesSelector = 'webkitMatchesSelector';
+  else if ('mozMatchesSelector' in Element.prototype)
+    matchesSelector = 'mozMatchesSelector';
+
   if (query.characterData) {
     function textNodeFilter(node) {
       return node.nodeType == Node.TEXT_NODE || node.nodeType == Node.COMMENT_NODE;
@@ -79,7 +85,7 @@ MutationSummary.createQueryValidator = function(root, query) {
       if (node.nodeType != Node.ELEMENT_NODE)
         return false;
       return query.elementFilter.some(function(pattern) {
-        return node.webkitMatchesSelector(pattern.selectorString);
+        return node[matchesSelector](pattern.selectorString);
       });
     }
 
