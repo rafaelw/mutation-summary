@@ -779,7 +779,9 @@ function testElementFilterHTMLCaseInsensitive() {
 function testElementFilterSVGCaseSensitive() {
   testCase.waitForAsync();
 
-  var svgDoc = document.implementation.createDocument('http://www.w3.org/2000/svg', 'svg', 'svg');
+  var docType = document.implementation.createDocumentType("svg", "-//W3C//DTD SVG 1.1//EN", null);
+  var svgDoc = document.implementation.createDocument('http://www.w3.org/2000/svg', 'svg', docType);
+
   testDiv = svgDoc.createElement('div');
 
   startObserving({
@@ -797,7 +799,7 @@ function testElementFilterSVGCaseSensitive() {
   div3.setAttribute('baz', 'fat');
 
   var span = div.appendChild(svgDoc.createElement('span'));
-  var upperSpan = div.appendChild(svgDoc.createElement('SPAN'));
+  var upperSpan = div.appendChild(div.appendChild(svgDoc.createElementNS('http://www.w3.org/2000/svg', 'SPAN')));
   var p = testDiv.appendChild(svgDoc.createElement('P'));
   p.setAttribute('bar', 'baz');
 
