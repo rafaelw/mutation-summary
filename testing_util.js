@@ -103,9 +103,6 @@ MutationSummary.createQueryValidator = function(root, query) {
 
       data.attributes = {};
       query.elementAttributes.forEach(function(attrName) {
-        if (caseInsensitive)
-          attrName = attrName.toLowerCase();
-
         data.attributes[attrName] = node.getAttribute(attrName);
       });
 

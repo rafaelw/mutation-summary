@@ -301,6 +301,9 @@
       if (!change || !change.attributes)
         throw Error('getOldAttribute requested on invalid node.');
 
+      if (change.matchCaseInsensitive)
+        attrName = attrName.toLowerCase();
+
       if (!hasOwnProperty(change.attributeOldValues, attrName))
         throw Error('getOldAttribute requested for unchanged attribute name.');
 
@@ -312,10 +315,16 @@
         return {}; // No attributes mutations occurred.
 
       var attributeFilter;
+      var caseInsensitiveFilter;
       if (postFilter) {
         attributeFilter = {};
+        caseInsensitiveFilter = {};
         postFilter.forEach(function(attrName) {
           attributeFilter[attrName] = true;
+          var lowerAttrName = attrName.toLowerCase();
+          if (attrName != lowerAttrName) {
+            caseInsensitiveFilter[lowerAttrName] = attrName;
+          }
         });
       }
 
@@ -325,27 +334,31 @@
       for (var i = 0; i < nodes.length; i++) {
         var node = nodes[i];
 
-        if (STAYED_IN != this.reachabilityChange(node) || STAYED_IN != this.matchabilityChange(node))
-          continue;
-
         var change = this.changeMap.get(node);
         if (!change.attributes)
+          continue;
+
+        if (STAYED_IN != this.reachabilityChange(node) || STAYED_IN != this.matchabilityChange(node))
           continue;
 
         var element = node;
         var oldValues = change.attributeOldValues;
 
         Object.keys(oldValues).forEach(function(name) {
-          if (attributeFilter && !attributeFilter[name])
+          var localName = name;
+          if (change.matchCaseInsensitive && caseInsensitiveFilter && caseInsensitiveFilter[name])
+            localName = caseInsensitiveFilter[name];
+
+          if (attributeFilter && !attributeFilter[localName])
             return;
 
           if (element.getAttribute(name) == oldValues[name])
             return;
 
-          if (!result[name])
-            result[name] = [];
+          if (!result[localName])
+            result[localName] = [];
 
-          result[name].push(element);
+          result[localName].push(element);
         });
       }
 
@@ -1210,6 +1223,7 @@
     if (!attribs.trim().length)
       throw Error('Invalid request option: elementAttributes must contain at least one attribute.');
 
+    var lowerAttributes = {};
     var attributes = {};
 
     var tokens = attribs.split(/\s+/);
@@ -1218,7 +1232,11 @@
       if (!attribute)
         continue;
 
-      attributes[validateAttribute(attribute)] = true;
+      var attribute = validateAttribute(attribute);
+      if (lowerAttributes.hasOwnProperty(attribute.toLowerCase()))
+        throw Error('Invalid request option: observing multiple case varitations of the same attribute is not supported.');
+      attributes[attribute] = true;
+      lowerAttributes[attribute.toLowerCase()] = true;
     }
 
     return Object.keys(attributes);
@@ -1354,6 +1372,7 @@
       attributeFilter = attributeFilter || {};
       attributes.forEach(function(attribute) {
         attributeFilter[attribute] = true;
+        attributeFilter[attribute.toLowerCase()] = true;
       });
     }
 
@@ -1411,7 +1430,8 @@
     projection.getChanged(summary);
 
     if (query.all || query.attribute || query.elementAttributes) {
-      var attributeChanged = projection.getAttributesChanged(query.elementAttributes);
+      var filter = query.attribute ? [ query.attribute ] : query.elementAttributes;
+      var attributeChanged = projection.getAttributesChanged(filter);
 
       if (query.attribute) {
         summary.valueChanged = [];

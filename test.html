@@ -132,10 +132,10 @@ function assertElementChanges(expectAdded,
   resetChanged();
 
   setTimeout(function() {
-    assertFalse(changed.hasOwnProperty('reordered'));
     compareNodeArrayIgnoreOrder(expectAdded, changed.added);
     compareNodeArrayIgnoreOrder(expectRemoved, changed.removed);
     compareNodeArrayIgnoreOrder(expectReparented, changed.reparented);
+    assertFalse(changed.hasOwnProperty('reordered'));
 
     assert(typeof expectChangedNodes === typeof changed.attributeChanged);
     if (expectChangedNodes) {
@@ -165,11 +165,11 @@ function assertAttributeChanges(expectAddedNodes, expectChangedNodes, expectOldV
   resetChanged();
 
   setTimeout(function() {
-    assertFalse(changed.hasOwnProperty('reparented'));
-    assertFalse(changed.hasOwnProperty('reordered'));
     compareNodeArrayIgnoreOrder(expectAddedNodes, changed.added);
     compareNodeArrayIgnoreOrder(expectChangedNodes, changed.valueChanged);
     compareNodeArrayIgnoreOrder(expectRemovedNodes, changed.removed);
+    assertFalse(changed.hasOwnProperty('reparented'));
+    assertFalse(changed.hasOwnProperty('reordered'));
 
     expectChangedNodes.forEach(function(node, index) {
       assertEquals(expectOldValues[index], changed.getOldAttribute(node));
@@ -615,6 +615,14 @@ function testOptionsValidation() {
       queries: [{ foo: true  }]
     });
   });
+
+    // Disallow listening to multiple 'cases' of the same attribute.
+  assertThrows(function() {
+    new MutationSummary({
+      callback: function() {},
+      queries: [{ element: 'a', elementAttributes: 'Bar bar' }]
+    });
+  });
 }
 
 function testAttributeBasic() {
@@ -630,6 +638,40 @@ function testAttributeBasic() {
 
   startObserving({
     attribute: "foo"
+  });
+
+  div.setAttribute('foo', 'bar2');
+  div2.setAttribute('foo', 'baz');
+  testDiv.appendChild(div3);
+  div3.setAttribute('foo', 'bat2');
+
+  assertAttributeChanges([div2, div3], [div], ['bar'], []).then(function() {
+    div3.setAttribute('foo', 'bat3');
+    testDiv.removeChild(div3);
+    testDiv.removeChild(div);
+    div2.setAttribute('foo', 'baz2');
+    assertAttributeChanges([], [div2], ['baz'], [div3, div]).then(function() {
+      div2.removeAttribute('foo');
+      div2.setAttribute('foo', 'baz2');
+
+      assertNothingReported().then(continueTesting);
+    });
+  });
+}
+
+function testAttributeCaseInsensitive() {
+  testCase.waitForAsync();
+
+  var div = testDiv.appendChild(document.createElement('div'));
+  div.setAttribute('foo', 'bar');
+
+  var div2 = testDiv.appendChild(document.createElement('div'));
+
+  var div3 = document.createElement('div');
+  div3.setAttribute('foo', 'bat');
+
+  startObserving({
+    attribute: "FOO"
   });
 
   div.setAttribute('foo', 'bar2');
@@ -738,12 +780,29 @@ function testElementFilterAttributeSpecified() {
   });
 }
 
-function testElementFilterHTMLCaseInsensitive() {
+
+function testCaseInsensitiveElementAttributes() {
+  testCase.waitForAsync();
+
+  var div = testDiv.appendChild(document.createElement('div'));
+
+  startObserving({
+    element: 'div',
+    elementAttributes: 'foo BAR'
+  });
+
+  div.setAttribute('FOO', 'FOO');
+  div.setAttribute('bar', 'bar');
+
+  assertElementChanges([], [], {'foo': [div], 'BAR': [div]}, {'foo': [null], 'BAR': [null] }, []).then(continueTesting);
+}
+
+function testElementFilterHTMLCaseInsensitive2() {
   testCase.waitForAsync();
 
   startObserving({
     element: 'DIV[foo], A, *[bar], div[ BaZ = "bat"], span#foo[Blow~=blarg]',
-    elementAttributes: 'foo FOO'
+    elementAttributes: 'FOO'
   });
 
   var div = testDiv.appendChild(document.createElement('div'));
@@ -757,7 +816,7 @@ function testElementFilterHTMLCaseInsensitive() {
   var p = testDiv.appendChild(document.createElement('P'));
   p.setAttribute('baz', 'baz');
 
-  assertElementChanges([div], [], {'foo': [], 'FOO': []}, {'foo':[], 'FOO':[]}, []).then(function() {
+  assertElementChanges([div], [], {'FOO': []}, {'FOO':[]}, []).then(function() {
     div.setAttribute('foo', 'blarg');
 
     p.removeAttribute('baz');
@@ -766,7 +825,7 @@ function testElementFilterHTMLCaseInsensitive() {
     span.id = 'foo';
     span.setAttribute('bloW', 'blarg bloog');
 
-    assertElementChanges([p, div3, span], [], {'foo': [div], 'FOO':[]}, {'foo': ['foo'], 'FOO':[]}, []).then(function() {
+    assertElementChanges([p, div3, span], [], {'FOO':[div]}, {'FOO':['foo']}, []).then(function() {
 
       div3.removeAttribute('baz');
       div3.setAttribute('baz', 'bat');
@@ -786,7 +845,7 @@ function testElementFilterSVGCaseSensitive() {
 
   startObserving({
     element: 'div[foo], a, *[bar], div[ BaZ = "bat"], SPAN#foo[Blow~=blarg]',
-    elementAttributes: 'foo FOO'
+    elementAttributes: 'FOO'
   });
 
   var div = testDiv.appendChild(svgDoc.createElement('div'));
@@ -803,9 +862,8 @@ function testElementFilterSVGCaseSensitive() {
   var p = testDiv.appendChild(svgDoc.createElement('P'));
   p.setAttribute('bar', 'baz');
 
-  assertElementChanges([div2, p], [], {'foo':[], 'FOO':[]}, {'foo':[], 'FOO':[]}, []).then(function() {
+  assertElementChanges([div2, p], [], {'FOO':[]}, {'FOO':[]}, []).then(function() {
     div2.setAttribute('foo', 'bar');
-    div2.setAttribute('FOO', 'bar');
 
     p.removeAttribute('bar');
     p.setAttribute('BAR', 'bar');
@@ -817,7 +875,7 @@ function testElementFilterSVGCaseSensitive() {
     upperSpan.setAttribute('Blow', 'blarg bloog');
 
     assertElementChanges([div3, upperSpan], [],
-        {'foo': [div2], 'FOO': [div2]}, {'foo':['foo'], 'FOO': [null]}, [p]).then(function() {
+        {'FOO': []}, {'FOO': []}, [p]).then(function() {
       div3.removeAttribute('baz');
       div3.setAttribute('baz', 'bat');
 
