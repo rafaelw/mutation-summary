@@ -146,6 +146,13 @@ MutationSummary.createQueryValidator = function(root, query) {
           assertEquals(old.get(node).attributes[attrName], summary.getOldAttribute(node, attrName));
         });
       });
+
+      function checkOldParentNode(node) {
+        assertEquals(old.get(node).parentNode, summary.getOldParentNode(node));
+      }
+
+      summary.removed.forEach(checkOldParentNode);
+      summary.reparented.forEach(checkOldParentNode);
     }
 
     return new Validator(root, elementFilter, elementData, elementValidator);

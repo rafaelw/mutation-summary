@@ -300,6 +300,18 @@
       })
     },
 
+    getOldParentNode: function(node) {
+      var change = this.changeMap.get(node);
+      if (change && change.childList)
+        return change.oldParentNode ? change.oldParentNode : null;
+
+      var reachabilityChange = this.reachabilityChange(node);
+      if (reachabilityChange == STAYED_OUT || reachabilityChange == ENTERED)
+        throw Error('getOldParentNode requested on invalid node.');
+
+      return node.parentNode;
+    },
+
     getOldAttribute: function(element, attrName) {
       var change = this.changeMap.get(element);
       if (!change || !change.attributes)
@@ -1424,6 +1436,7 @@
       removed: []
     };
 
+    summary.getOldParentNode = projection.getOldParentNode.bind(projection);
 
     if (query.all || query.element)
       summary.reparented = [];
