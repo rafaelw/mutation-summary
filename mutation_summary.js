@@ -1565,7 +1565,8 @@
         callback(summaries);
 
       if (!options.observeOwnChanges) {
-        queryValidators.forEach(function(validator) { validator.recordPreviousState(); });
+        if (queryValidators)
+          queryValidators.forEach(function(validator) { validator.recordPreviousState(); });
         observer.observe(root, observerOptions);
       }
     });

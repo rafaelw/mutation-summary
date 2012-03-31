@@ -960,6 +960,24 @@ function testElementFilterWithClassname() {
   });
 }
 
+function testNoValidator() {
+  var validator = MutationSummary.createQueryValidator;
+  MutationSummary.createQueryValidator = undefined;
+  testCase.waitForAsync();
+
+  startObserving();
+
+  var div = testDiv.appendChild(document.createElement('div'));
+  var span = div.appendChild(document.createElement('span'));
+  assertSubtreeChanges([div, span], [], [], []).then(function() {
+
+    div.removeChild(span);
+    assertSubtreeChanges([], [], [], [span]).then(continueTesting);
+  });
+
+  MutationSummary.createQueryValidator = validator;
+}
+
 function testAddRemoveBasic() {
   testCase.waitForAsync();
 
