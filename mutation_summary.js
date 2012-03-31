@@ -312,6 +312,14 @@
       return node.parentNode;
     },
 
+    getOldPreviousSibling: function(node) {
+      var change = this.childlistChanges.get(node.parentNode);
+      if (!change || !this.wasReordered(node))
+        throw Error('getOldPreviousSibling requested on invalid node.');
+
+      return change.oldPreviousSibling.get(node);
+    },
+
     getOldAttribute: function(element, attrName) {
       var change = this.changeMap.get(element);
       if (!change || !change.attributes)
@@ -773,7 +781,7 @@
         return didMove;
       }
 
-      var oldPreviousCache = new NodeMap;
+      var oldPreviousCache = change.oldPreviousSibling = new NodeMap;
       function getOldPrevious(node) {
         var oldPrevious = oldPreviousCache.get(node);
         if (oldPrevious !== undefined)
@@ -1480,6 +1488,9 @@
         summary.characterDataChanged = characterDataChanged;
     }
 
+    if (summary.reordered)
+      summary.getOldPreviousSibling = projection.getOldPreviousSibling.bind(projection);
+
     return summary;
   }
 
@@ -1494,7 +1505,9 @@
     if (MutationSummary.createQueryValidator) {
       queryValidators = [];
       options.queries.forEach(function(query) {
-        queryValidators.push(MutationSummary.createQueryValidator(root, query));
+        var validator = MutationSummary.createQueryValidator(root, query);
+        validator.recordPreviousState();
+        queryValidators.push(validator);
       });
     }
 
@@ -1545,10 +1558,14 @@
         return false;
       });
 
+      if (queryValidators && options.observeOwnChanges)
+        queryValidators.forEach(function(validator) { validator.recordPreviousState(); });
+
       if (changesToReport)
         callback(summaries);
 
       if (!options.observeOwnChanges) {
+        queryValidators.forEach(function(validator) { validator.recordPreviousState(); });
         observer.observe(root, observerOptions);
       }
     });

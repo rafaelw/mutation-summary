@@ -32,6 +32,31 @@ MutationSummary.createQueryValidator = function(root, query) {
   else if ('mozMatchesSelector' in Element.prototype)
     matchesSelector = 'mozMatchesSelector';
 
+
+  if (query.all) {
+    function allFilter(node) {
+      return typeof node.appendChild == 'function';
+    }
+
+    function allData(node) {
+      var oldPreviousSiblingMap = new MutationSummary.NodeMap;
+
+      for (var child = node.firstChild; child; child = child.nextSibling)
+        oldPreviousSiblingMap.set(child, child.previousSibling);
+
+      return oldPreviousSiblingMap;
+    }
+
+    function allValidator(summary, stayed, old, current) {
+      summary.reordered.forEach(function(node) {
+        var oldPreviousSiblingMap = old.get(summary.getOldParentNode(node));
+        assertEquals(oldPreviousSiblingMap.get(node), summary.getOldPreviousSibling(node));
+      });
+    }
+
+    return new Validator(root, allFilter, allData, allValidator);
+  }
+
   if (query.characterData) {
     function textNodeFilter(node) {
       return node.nodeType == Node.TEXT_NODE || node.nodeType == Node.COMMENT_NODE;
@@ -175,7 +200,9 @@ function Validator(root, includeFunc, dataFunc, validateFunc) {
     return map;
   }
 
-  this.current = collectNodeMap(root, includeFunc, dataFunc);
+  this.recordPreviousState = function() {
+    this.current = collectNodeMap(root, includeFunc, dataFunc)
+  };
 
   this.validate = function(summary) {
     var old = this.current;
