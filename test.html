@@ -974,6 +974,22 @@ function testAddRemoveBasic() {
   });
 }
 
+function testSequentialRemovals() {
+  testCase.waitForAsync();
+
+  var div = testDiv.appendChild(document.createElement('div'));
+
+  startObserving();
+
+  testDiv.removeChild(div);
+  var div2 = document.createElement('div');
+  div2.appendChild(div);
+  testDiv.appendChild(div2);
+  div2.removeChild(div);
+
+  assertSubtreeChanges([div2], [], [], [div]).then(continueTesting);
+}
+
 function testAddAndRemoveOutsideTree() {
   testCase.waitForAsync();
 

@@ -142,6 +142,10 @@
       forEach(mutation.removedNodes, function(el) {
         var change = this.getParentChange(el);
 
+        // Note: is it possible to receive a removal followed by a removal. This
+        // can occur if the removed node is added to an non-observed node, that
+        // node is added to the observed area, and then the node removed from
+        // it.
         if (change.added || change.oldParentNode)
           change.added = false;
         else
