@@ -23,6 +23,9 @@
     matchesSelector = 'mozMatchesSelector';
 
   var MutationObserver = global.MutationObserver || global.WebKitMutationObserver || global.MozMutationObserver;
+  if (typeof MutationObserver != 'function') {
+    return;
+  }
 
   // NodeMap UtilityClass. Exposed as MutationSummary.NodeMap.
   // TODO(rafaelw): Consider using Harmony Map when available.
