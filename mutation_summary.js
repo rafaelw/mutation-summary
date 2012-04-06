@@ -108,8 +108,10 @@
 
   var forEach = Array.prototype.forEach.call.bind(Array.prototype.forEach);
 
-  function MutationProjection(rootNode) {
+  function MutationProjection(rootNode, elementFilter, calcReordered) {
     this.rootNode = rootNode;
+    this.elementFilter = elementFilter;
+    this.calcReordered = calcReordered;
   }
 
   MutationProjection.prototype = {
@@ -1498,54 +1500,55 @@
   }
 
   function MutationSummary(opts) {
+    var connected = false;
     var options = validateOptions(opts);
     var observerOptions = createObserverOptions(options.queries);
 
     var root = options.rootNode;
     var callback = options.callback;
 
-    var queryValidators;
+    var elementFilter = Array.prototype.concat.apply([], options.queries.map(function(query) {
+      return query.elementFilter ? query.elementFilter : [];
+    }));
+    if (!elementFilter.length)
+      elementFilter = undefined;
+
+    var calcReordered = options.queries.some(function(query) {
+      return query.all;
+    });
+
+    var queryValidators = []
     if (MutationSummary.createQueryValidator) {
-      queryValidators = [];
-      options.queries.forEach(function(query) {
-        var validator = MutationSummary.createQueryValidator(root, query);
-        validator.recordPreviousState();
-        queryValidators.push(validator);
+      queryValidators = options.queries.map(function(query) {
+        return MutationSummary.createQueryValidator(root, query);
       });
     }
 
-    var observer = new MutationObserver(function(mutations) {
-      if (!options.observeOwnChanges) {
-        observer.disconnect();
-      }
-
-      var projection = new MutationProjection(root);
-      var elementFilter = [];
-      options.queries.forEach(function(query) {
-        if (query.all)
-          projection.calcReordered = true;
-
-        if (query.elementFilter) {
-          elementFilter = elementFilter.concat(query.elementFilter);
-          projection.elementFilter = elementFilter;
-        }
+    function checkpointQueryValidators() {
+      queryValidators.forEach(function(validator) {
+        if (validator)
+          validator.recordPreviousState();
       });
+    }
+
+    function runQueryValidators(summaries) {
+      queryValidators.forEach(function(validator, index) {
+        if (validator)
+          validator.validate(summaries[index]);
+      });
+    }
+
+    function createSummaries(mutations) {
+      var projection = new MutationProjection(root, elementFilter, calcReordered);
       projection.processMutations(mutations);
 
-      var summaries = [];
-      options.queries.forEach(function(query) {
-        summaries.push(createSummary(projection, root, query));
+      return options.queries.map(function(query) {
+        return createSummary(projection, root, query);
       });
+    }
 
-      if (queryValidators) {
-        queryValidators.forEach(function(validator, index) {
-          if (!validator)
-            return;
-          validator.validate(summaries[index]);
-        });
-      }
-
-      var changesToReport = summaries.some(function(summary) {
+    function changesToReport(summaries) {
+      return summaries.some(function(summary) {
         var summaryProps =  ['added', 'removed', 'reordered', 'reparented',
                              'valueChanged', 'characterDataChanged'];
         if (summaryProps.some(function(prop) { return summary[prop] && summary[prop].length; }))
@@ -1560,25 +1563,45 @@
         }
         return false;
       });
+    }
 
-      if (queryValidators && options.observeOwnChanges)
-        queryValidators.forEach(function(validator) { validator.recordPreviousState(); });
+    var observer = new MutationObserver(function(mutations) {
+      if (!options.observeOwnChanges)
+        observer.disconnect();
 
-      if (changesToReport)
+      var summaries = createSummaries(mutations);
+      runQueryValidators(summaries);
+
+      if (options.observeOwnChanges)
+        checkpointQueryValidators();
+
+      if (changesToReport(summaries))
         callback(summaries);
 
       if (!options.observeOwnChanges) {
-        if (queryValidators)
-          queryValidators.forEach(function(validator) { validator.recordPreviousState(); });
+        checkpointQueryValidators();
         observer.observe(root, observerOptions);
       }
     });
 
-    observer.observe(root, observerOptions);
+    this.reconnect = function() {
+      if (connected)
+        throw Error('Already connected');
+
+      observer.observe(root, observerOptions);
+      connected = true;
+      checkpointQueryValidators();
+    };
 
     this.disconnect = function() {
+      if (!connected)
+        throw Error('Not connected');
+
       observer.disconnect();
+      connected = false;
     };
+
+    this.reconnect();
   }
 
   // Externs
