@@ -30,7 +30,7 @@
   // NodeMap UtilityClass. Exposed as MutationSummary.NodeMap.
   // TODO(rafaelw): Consider using Harmony Map when available.
 
-  var ID_PROP = '__mutation-summary_node-map-id__';
+  var ID_PROP = '__mutation_summary_node_map_id__';
   var nextId_ = 1;
 
   function ensureId(node) {
