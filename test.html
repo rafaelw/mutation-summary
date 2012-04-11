@@ -122,14 +122,15 @@ function assertElementChanges(expectAdded,
                               expectReparented,
                               expectChangedNodes,
                               expectOldValues,
-                              expectRemoved) {
+                              expectRemoved,
+                              opt_summaries) {
   var promise = {
     then: function(f) {
       this.continue = f;
     }
   };
 
-  resetChanged();
+  resetChanged(opt_summaries);
 
   setTimeout(function() {
     compareNodeArrayIgnoreOrder(expectAdded, changed.added);
@@ -622,6 +623,31 @@ function testOptionsValidation() {
       callback: function() {},
       queries: [{ element: 'a', elementAttributes: 'Bar bar' }]
     });
+  });
+}
+
+function testDisconnectReconnect() {
+  testCase.waitForAsync();
+
+  var div = testDiv.appendChild(document.createElement('div'));
+  div.setAttribute('foo', '1');
+
+  startObserving({
+    element: 'div',
+    elementAttributes: 'foo bar'
+  });
+
+  div.setAttribute('foo', '2');
+
+  var summaries = observer.disconnect();
+  div.setAttribute('bar', '3'); // should be ignored.
+  observer.reconnect();
+
+  // summaries returned from disconnect are handed in.
+  assertElementChanges([], [], { 'foo': [div], 'bar': [] }, { 'foo': ['1'], 'bar':[] }, [], summaries).then(function() {
+    div.setAttribute('foo', '3');
+    // change to 'bar' should never be reported.
+    assertElementChanges([], [], { 'foo': [div], 'bar': [] }, { 'foo': ['2'], 'bar':[] }, [], summaries).then(continueTesting);
   });
 }
 

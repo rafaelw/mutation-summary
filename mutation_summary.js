@@ -1539,6 +1539,9 @@
     }
 
     function createSummaries(mutations) {
+      if (!mutations || !mutations.length)
+        return [];
+
       var projection = new MutationProjection(root, elementFilter, calcReordered);
       projection.processMutations(mutations);
 
@@ -1597,8 +1600,19 @@
       if (!connected)
         throw Error('Not connected');
 
+      // TODO(rafaelw): Remove check when Chrome M18 is gone.
+      var mutations;
+      if (typeof observer.takeRecords == 'function')
+        mutations = observer.takeRecords();
+      else
+        console.log("Warning: MutationObserver.takeRecords not implemented. Current changes cannot be reported.");
+
       observer.disconnect();
       connected = false;
+
+      var summaries = createSummaries(mutations);
+      if (changesToReport(summaries))
+        return summaries;
     };
 
     this.reconnect();
