@@ -1600,12 +1600,7 @@
       if (!connected)
         throw Error('Not connected');
 
-      // TODO(rafaelw): Remove check when Chrome M18 is gone.
-      var mutations;
-      if (typeof observer.takeRecords == 'function')
-        mutations = observer.takeRecords();
-      else
-        console.log("Warning: MutationObserver.takeRecords not implemented. Current changes cannot be reported.");
+      var mutations = observer.takeRecords();
 
       observer.disconnect();
       connected = false;
