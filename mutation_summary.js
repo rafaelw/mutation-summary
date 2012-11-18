@@ -1596,18 +1596,23 @@
       checkpointQueryValidators();
     };
 
-    this.disconnect = function() {
+    var takeSummaries = this.takeSummaries = function() {
       if (!connected)
         throw Error('Not connected');
 
       var mutations = observer.takeRecords();
+      var summaries = createSummaries(mutations);
+      if (changesToReport(summaries))
+        return summaries;
+    };
+
+    this.disconnect = function() {
+      var summaries = takeSummaries();
 
       observer.disconnect();
       connected = false;
 
-      var summaries = createSummaries(mutations);
-      if (changesToReport(summaries))
-        return summaries;
+      return summaries;
     };
 
     this.reconnect();

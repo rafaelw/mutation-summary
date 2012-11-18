@@ -41,30 +41,14 @@ var observer;
 var observing;
 var changed;
 
-var summariesDelivered = false;
-
-function resetChanged(summaries) {
-  if (summaries) {
-    changed = summaries[0];
-    summariesDelivered = true;
-  } else {
-    changed = {
-      added: [],
-      removed: [],
-      reparented: [],
-      reordered: [],
-      characterData: []
-    }
-    summariesDelivered = false;
-  }
-}
-
 function startObserving(query) {
   query = query || { all: true };
 
   observer = new MutationSummary({
     rootNode: testDiv,
-    callback: resetChanged,
+    callback: function() {
+      throw 'Mutation Delivered at end of microtask'
+    },
     queries: [query]
   });
 
@@ -92,30 +76,17 @@ function assertSubtreeChanges(expectAdded,
                               expectReparented,
                               expectReordered,
                               expectRemoved) {
-  var promise = {
-    then: function(f) {
-      this.continue = f;
-    }
-  };
+  var changed = observer.takeSummaries()[0];
+  compareNodeArrayIgnoreOrder(expectAdded, changed.added);
+  compareNodeArrayIgnoreOrder(expectRemoved, changed.removed);
 
-  resetChanged();
+  assert(typeof expectReparented === typeof changed.reparented);
+  if (expectReparented)
+    compareNodeArrayIgnoreOrder(expectReparented, changed.reparented);
 
-  setTimeout(function() {
-    compareNodeArrayIgnoreOrder(expectAdded, changed.added);
-    compareNodeArrayIgnoreOrder(expectRemoved, changed.removed);
-
-    assert(typeof expectReparented === typeof changed.reparented);
-    if (expectReparented)
-      compareNodeArrayIgnoreOrder(expectReparented, changed.reparented);
-
-    assert(typeof expectReordered === typeof changed.reordered);
-    if (expectReordered)
-      compareNodeArrayIgnoreOrder(expectReordered, changed.reordered);
-
-    promise.continue();
-  }, 0);
-
-  return promise;
+  assert(typeof expectReordered === typeof changed.reordered);
+  if (expectReordered)
+    compareNodeArrayIgnoreOrder(expectReordered, changed.reordered);
 }
 
 function assertElementChanges(expectAdded,
@@ -124,108 +95,58 @@ function assertElementChanges(expectAdded,
                               expectOldValues,
                               expectRemoved,
                               opt_summaries) {
-  var promise = {
-    then: function(f) {
-      this.continue = f;
-    }
-  };
+  var changed = opt_summaries ? opt_summaries[0] : observer.takeSummaries()[0];
 
-  resetChanged(opt_summaries);
+  compareNodeArrayIgnoreOrder(expectAdded, changed.added);
+  compareNodeArrayIgnoreOrder(expectRemoved, changed.removed);
+  compareNodeArrayIgnoreOrder(expectReparented, changed.reparented);
+  assertFalse(changed.hasOwnProperty('reordered'));
 
-  setTimeout(function() {
-    compareNodeArrayIgnoreOrder(expectAdded, changed.added);
-    compareNodeArrayIgnoreOrder(expectRemoved, changed.removed);
-    compareNodeArrayIgnoreOrder(expectReparented, changed.reparented);
-    assertFalse(changed.hasOwnProperty('reordered'));
+  assert(typeof expectChangedNodes === typeof changed.attributeChanged);
+  if (expectChangedNodes) {
+    assertEquals(Object.keys(expectChangedNodes).length, Object.keys(changed.attributeChanged).length);
 
-    assert(typeof expectChangedNodes === typeof changed.attributeChanged);
-    if (expectChangedNodes) {
-      assertEquals(Object.keys(expectChangedNodes).length, Object.keys(changed.attributeChanged).length);
-
-      Object.keys(expectChangedNodes).forEach(function(attrName) {
-        compareNodeArrayIgnoreOrder(expectChangedNodes[attrName], changed.attributeChanged[attrName]);
-        expectOldValues[attrName].forEach(function(attrOldValue, index) {
-          assertEquals(expectOldValues[attrName][index], changed.getOldAttribute(expectChangedNodes[attrName][index], attrName));
-        });
+    Object.keys(expectChangedNodes).forEach(function(attrName) {
+      compareNodeArrayIgnoreOrder(expectChangedNodes[attrName], changed.attributeChanged[attrName]);
+      expectOldValues[attrName].forEach(function(attrOldValue, index) {
+        assertEquals(expectOldValues[attrName][index], changed.getOldAttribute(expectChangedNodes[attrName][index], attrName));
       });
-    }
-
-    promise.continue();
-  }, 0);
-
-  return promise;
+    });
+  }
 }
 
 function assertAttributeChanges(expectAddedNodes, expectChangedNodes, expectOldValues, expectRemovedNodes) {
-  var promise = {
-    then: function(f) {
-      this.continue = f;
-    }
-  };
+  var changed = observer.takeSummaries()[0];
 
-  resetChanged();
+  compareNodeArrayIgnoreOrder(expectAddedNodes, changed.added);
+  compareNodeArrayIgnoreOrder(expectChangedNodes, changed.valueChanged);
+  compareNodeArrayIgnoreOrder(expectRemovedNodes, changed.removed);
+  assertFalse(changed.hasOwnProperty('reparented'));
+  assertFalse(changed.hasOwnProperty('reordered'));
 
-  setTimeout(function() {
-    compareNodeArrayIgnoreOrder(expectAddedNodes, changed.added);
-    compareNodeArrayIgnoreOrder(expectChangedNodes, changed.valueChanged);
-    compareNodeArrayIgnoreOrder(expectRemovedNodes, changed.removed);
-    assertFalse(changed.hasOwnProperty('reparented'));
-    assertFalse(changed.hasOwnProperty('reordered'));
-
-    expectChangedNodes.forEach(function(node, index) {
-      assertEquals(expectOldValues[index], changed.getOldAttribute(node));
-    });
-
-    promise.continue();
-  }, 0);
-
-  return promise;
+  expectChangedNodes.forEach(function(node, index) {
+    assertEquals(expectOldValues[index], changed.getOldAttribute(node));
+  });
 }
 
 function assertCharacterDataChanges(expectAddedNodes,
                                     expectChangedNodes,
                                     expectOldValues,
                                     expectRemovedNodes) {
-  var promise = {
-    then: function(f) {
-      this.continue = f;
-    }
-  };
+  var changed = observer.takeSummaries()[0];
 
-  resetChanged();
+  compareNodeArrayIgnoreOrder(expectAddedNodes, changed.added);
+  compareNodeArrayIgnoreOrder(expectChangedNodes, changed.valueChanged);
+  compareNodeArrayIgnoreOrder(expectRemovedNodes, changed.removed);
 
-  setTimeout(function() {
-    compareNodeArrayIgnoreOrder(expectAddedNodes, changed.added);
-    compareNodeArrayIgnoreOrder(expectChangedNodes, changed.valueChanged);
-    compareNodeArrayIgnoreOrder(expectRemovedNodes, changed.removed);
-
-    expectChangedNodes.forEach(function(node, index) {
-      assertEquals(expectOldValues[index],
-                   changed.getOldCharacterData(expectChangedNodes[index]));
-    });
-
-    promise.continue();
-  }, 0);
-
-  return promise;
+  expectChangedNodes.forEach(function(node, index) {
+    assertEquals(expectOldValues[index],
+                 changed.getOldCharacterData(expectChangedNodes[index]));
+  });
 }
 
 function assertNothingReported() {
-  var promise = {
-    then: function(f) {
-      this.continue = f;
-    }
-  };
-
-  resetChanged();
-
-  setTimeout(function() {
-    assertFalse(summariesDelivered);
-
-    promise.continue();
-  }, 0);
-
-  return promise;
+  assertUndefined(observer.takeSummaries());
 }
 
 function assertSelectorNames(selectors, expectSelectorStrings) {
@@ -627,8 +548,6 @@ function testOptionsValidation() {
 }
 
 function testDisconnectReconnect() {
-  testCase.waitForAsync();
-
   var div = testDiv.appendChild(document.createElement('div'));
   div.setAttribute('foo', '1');
 
@@ -644,16 +563,14 @@ function testDisconnectReconnect() {
   observer.reconnect();
 
   // summaries returned from disconnect are handed in.
-  assertElementChanges([], [], { 'foo': [div], 'bar': [] }, { 'foo': ['1'], 'bar':[] }, [], summaries).then(function() {
-    div.setAttribute('foo', '3');
-    // change to 'bar' should never be reported.
-    assertElementChanges([], [], { 'foo': [div], 'bar': [] }, { 'foo': ['2'], 'bar':[] }, [], summaries).then(continueTesting);
-  });
+  assertElementChanges([], [], { 'foo': [div], 'bar': [] }, { 'foo': ['1'], 'bar':[] }, [], summaries);
+  div.setAttribute('foo', '3');
+
+  // change to 'bar' should never be reported.
+  assertElementChanges([], [], { 'foo': [div], 'bar': [] }, { 'foo': ['2'], 'bar':[] }, []);
 }
 
 function testAttributeBasic() {
-  testCase.waitForAsync();
-
   var div = testDiv.appendChild(document.createElement('div'));
   div.setAttribute('foo', 'bar');
 
@@ -670,24 +587,20 @@ function testAttributeBasic() {
   div2.setAttribute('foo', 'baz');
   testDiv.appendChild(div3);
   div3.setAttribute('foo', 'bat2');
+  assertAttributeChanges([div2, div3], [div], ['bar'], [])
 
-  assertAttributeChanges([div2, div3], [div], ['bar'], []).then(function() {
-    div3.setAttribute('foo', 'bat3');
-    testDiv.removeChild(div3);
-    testDiv.removeChild(div);
-    div2.setAttribute('foo', 'baz2');
-    assertAttributeChanges([], [div2], ['baz'], [div3, div]).then(function() {
-      div2.removeAttribute('foo');
-      div2.setAttribute('foo', 'baz2');
+  div3.setAttribute('foo', 'bat3');
+  testDiv.removeChild(div3);
+  testDiv.removeChild(div);
+  div2.setAttribute('foo', 'baz2');
+  assertAttributeChanges([], [div2], ['baz'], [div3, div]);
 
-      assertNothingReported().then(continueTesting);
-    });
-  });
+  div2.removeAttribute('foo');
+  div2.setAttribute('foo', 'baz2');
+  assertNothingReported();
 }
 
 function testAttributeCaseInsensitive() {
-  testCase.waitForAsync();
-
   var div = testDiv.appendChild(document.createElement('div'));
   div.setAttribute('foo', 'bar');
 
@@ -704,25 +617,21 @@ function testAttributeCaseInsensitive() {
   div2.setAttribute('foo', 'baz');
   testDiv.appendChild(div3);
   div3.setAttribute('foo', 'bat2');
+  assertAttributeChanges([div2, div3], [div], ['bar'], []);
 
-  assertAttributeChanges([div2, div3], [div], ['bar'], []).then(function() {
-    div3.setAttribute('foo', 'bat3');
-    testDiv.removeChild(div3);
-    testDiv.removeChild(div);
-    div2.setAttribute('foo', 'baz2');
-    assertAttributeChanges([], [div2], ['baz'], [div3, div]).then(function() {
-      div2.removeAttribute('foo');
-      div2.setAttribute('foo', 'baz2');
+  div3.setAttribute('foo', 'bat3');
+  testDiv.removeChild(div3);
+  testDiv.removeChild(div);
+  div2.setAttribute('foo', 'baz2');
+  assertAttributeChanges([], [div2], ['baz'], [div3, div]);
 
-      assertNothingReported().then(continueTesting);
-    });
-  });
+  div2.removeAttribute('foo');
+  div2.setAttribute('foo', 'baz2');
+  assertNothingReported();
 }
 
 // TODO(rafaelw): Add node movement to this.
 function testCharacterDataBasic() {
-  testCase.waitForAsync();
-
   var div = testDiv.appendChild(document.createElement('div'));
   div.innerHTML = 'foo';
   var text = div.firstChild;
@@ -736,24 +645,20 @@ function testCharacterDataBasic() {
   var comment2 = div.appendChild(document.createComment('456'));
   comment2.textContent = '789';
   var div2 = testDiv.appendChild(document.createElement('div'));
+  assertCharacterDataChanges([comment2], [text, comment], ['foo', '123'], []);
 
-  assertCharacterDataChanges([comment2], [text, comment], ['foo', '123'], []).then(function() {
-    text.textContent = 'baz';
-    text.textContent = 'bat';
-    div.removeChild(comment2);
+  text.textContent = 'baz';
+  text.textContent = 'bat';
+  div.removeChild(comment2);
+  assertCharacterDataChanges([], [text], ['bar'], [comment2]);
 
-    assertCharacterDataChanges([], [text], ['bar'], [comment2]).then(function() {
-      text.textContent = 'bar';
-      text.textContent = 'bat'; // Restoring its original value should mean
-                                // we won't hear about the change.
-      assertNothingReported().then(continueTesting);
-    });
-  });
+  text.textContent = 'bar';
+  text.textContent = 'bat'; // Restoring its original value should mean
+                            // we won't hear about the change.
+  assertNothingReported();
 }
 
 function testElementFilterBasic() {
-  testCase.waitForAsync();
-
   startObserving({
     element: 'div, A, p'
   });
@@ -761,18 +666,14 @@ function testElementFilterBasic() {
   var div = testDiv.appendChild(document.createElement('div'));
   var span = div.appendChild(document.createElement('span'));
   var p = testDiv.appendChild(document.createElement('P'));
+  assertElementChanges([div, p], [], undefined, undefined, []);
 
-  assertElementChanges([div, p], [], undefined, undefined, []).then(function() {
-    testDiv.removeChild(div);
-    testDiv.appendChild(div);
-
-    assertNothingReported().then(continueTesting);
-  });
+  testDiv.removeChild(div);
+  testDiv.appendChild(div);
+  assertNothingReported();
 }
 
 function testElementFilterAttributeSpecified() {
-  testCase.waitForAsync();
-
   startObserving({
     element: 'div[foo], A, *[bar], div[ baz = "bat"], span#foo[blow~=blarg]'
   });
@@ -787,29 +688,23 @@ function testElementFilterAttributeSpecified() {
   var span = div.appendChild(document.createElement('span'));
   var p = testDiv.appendChild(document.createElement('P'));
   p.setAttribute('baz', 'baz');
+  assertElementChanges([div], [], undefined, undefined, []);
 
-  assertElementChanges([div], [], undefined, undefined, []).then(function() {
-    div.removeAttribute('foo');
-    p.removeAttribute('baz');
-    p.setAttribute('bar', 'bar');
-    div3.setAttribute('baz', 'bat');
-    span.id = 'foo';
-    span.setAttribute('blow', 'blarg bloog');
+  div.removeAttribute('foo');
+  p.removeAttribute('baz');
+  p.setAttribute('bar', 'bar');
+  div3.setAttribute('baz', 'bat');
+  span.id = 'foo';
+  span.setAttribute('blow', 'blarg bloog');
+  assertElementChanges([p, div3, span], [], undefined, undefined, [div]);
 
-    assertElementChanges([p, div3, span], [], undefined, undefined, [div]).then(function() {
-
-      div3.removeAttribute('baz');
-      div3.setAttribute('baz', 'bat');
-
-      assertNothingReported().then(continueTesting);
-    });
-  });
+  div3.removeAttribute('baz');
+  div3.setAttribute('baz', 'bat');
+  assertNothingReported();
 }
 
 
 function testCaseInsensitiveElementAttributes() {
-  testCase.waitForAsync();
-
   var div = testDiv.appendChild(document.createElement('div'));
 
   startObserving({
@@ -819,13 +714,10 @@ function testCaseInsensitiveElementAttributes() {
 
   div.setAttribute('FOO', 'FOO');
   div.setAttribute('bar', 'bar');
-
-  assertElementChanges([], [], {'foo': [div], 'BAR': [div]}, {'foo': [null], 'BAR': [null] }, []).then(continueTesting);
+  assertElementChanges([], [], {'foo': [div], 'BAR': [div]}, {'foo': [null], 'BAR': [null] }, []);
 }
 
 function testElementFilterHTMLCaseInsensitive2() {
-  testCase.waitForAsync();
-
   startObserving({
     element: 'DIV[foo], A, *[bar], div[ BaZ = "bat"], span#foo[Blow~=blarg]',
     elementAttributes: 'FOO'
@@ -841,29 +733,23 @@ function testElementFilterHTMLCaseInsensitive2() {
   var span = div.appendChild(document.createElement('span'));
   var p = testDiv.appendChild(document.createElement('P'));
   p.setAttribute('baz', 'baz');
+  assertElementChanges([div], [], {'FOO': []}, {'FOO':[]}, []);
 
-  assertElementChanges([div], [], {'FOO': []}, {'FOO':[]}, []).then(function() {
-    div.setAttribute('foo', 'blarg');
+  div.setAttribute('foo', 'blarg');
 
-    p.removeAttribute('baz');
-    p.setAttribute('bar', 'bar');
-    div3.setAttribute('baz', 'bat');
-    span.id = 'foo';
-    span.setAttribute('bloW', 'blarg bloog');
+  p.removeAttribute('baz');
+  p.setAttribute('bar', 'bar');
+  div3.setAttribute('baz', 'bat');
+  span.id = 'foo';
+  span.setAttribute('bloW', 'blarg bloog');
+  assertElementChanges([p, div3, span], [], {'FOO':[div]}, {'FOO':['foo']}, []);
 
-    assertElementChanges([p, div3, span], [], {'FOO':[div]}, {'FOO':['foo']}, []).then(function() {
-
-      div3.removeAttribute('baz');
-      div3.setAttribute('baz', 'bat');
-
-      assertNothingReported().then(continueTesting);
-    });
-  });
+  div3.removeAttribute('baz');
+  div3.setAttribute('baz', 'bat');
+  assertNothingReported();
 }
 
 function testElementFilterSVGCaseSensitive() {
-  testCase.waitForAsync();
-
   var docType = document.implementation.createDocumentType("svg", "-//W3C//DTD SVG 1.1//EN", null);
   var svgDoc = document.implementation.createDocument('http://www.w3.org/2000/svg', 'svg', docType);
 
@@ -887,39 +773,32 @@ function testElementFilterSVGCaseSensitive() {
   var upperSpan = div.appendChild(div.appendChild(svgDoc.createElementNS('http://www.w3.org/2000/svg', 'SPAN')));
   var p = testDiv.appendChild(svgDoc.createElement('P'));
   p.setAttribute('bar', 'baz');
+  assertElementChanges([div2, p], [], {'FOO':[]}, {'FOO':[]}, []);
 
-  assertElementChanges([div2, p], [], {'FOO':[]}, {'FOO':[]}, []).then(function() {
-    div2.setAttribute('foo', 'bar');
+  div2.setAttribute('foo', 'bar');
 
-    p.removeAttribute('bar');
-    p.setAttribute('BAR', 'bar');
+  p.removeAttribute('bar');
+  p.setAttribute('BAR', 'bar');
 
-    div3.setAttribute('BaZ', 'bat');
+  div3.setAttribute('BaZ', 'bat');
 
-    // Note: SVG Elements aren't HTMLElements, so el.id doesn't delegate to the 'id' attribute.
-    upperSpan.setAttribute('id', 'foo');
-    upperSpan.setAttribute('Blow', 'blarg bloog');
+  // Note: SVG Elements aren't HTMLElements, so el.id doesn't delegate to the 'id' attribute.
+  upperSpan.setAttribute('id', 'foo');
+  upperSpan.setAttribute('Blow', 'blarg bloog');
+  assertElementChanges([div3, upperSpan], [], {'FOO': []}, {'FOO': []}, [p]);
 
-    assertElementChanges([div3, upperSpan], [],
-        {'FOO': []}, {'FOO': []}, [p]).then(function() {
-      div3.removeAttribute('baz');
-      div3.setAttribute('baz', 'bat');
-
-      assertNothingReported().then(continueTesting);
-    });
-  });
+  div3.removeAttribute('baz');
+  div3.setAttribute('baz', 'bat');
+  assertNothingReported();
 }
 
 function testElementFilterWithElementAttributes() {
-  testCase.waitForAsync();
-
   var div = testDiv.appendChild(document.createElement('div'));
   div.setAttribute('foo', 'bar');
   div.setAttribute('baz', 'bat');
   div.setAttribute('boo', 'bag');
 
   var div2 = testDiv.appendChild(document.createElement('div'));
-
 
   startObserving({
     element: '  div[  baz  ]',
@@ -936,24 +815,19 @@ function testElementFilterWithElementAttributes() {
   var div3 = testDiv.appendChild(document.createElement('div'));
   div3.setAttribute('baz', 'bar');
   div2.appendChild(div);
+  assertElementChanges([div2, div3], [div], { 'foo': [div], 'boo': [] }, { 'foo': ['bar'], 'boo':[] }, []);
 
-  assertElementChanges([div2, div3], [div], { 'foo': [div], 'boo': [] }, { 'foo': ['bar'], 'boo':[] }, []).then(function() {
-    testDiv.appendChild(div);
-    div3.removeAttribute('baz');
-    testDiv.removeChild(div2);
+  testDiv.appendChild(div);
+  div3.removeAttribute('baz');
+  testDiv.removeChild(div2);
+  assertElementChanges([], [div], {'foo':[], 'boo':[]}, {'foo':[], 'boo':[]}, [div2, div3]);
 
-    assertElementChanges([], [div], {'foo':[], 'boo':[]}, {'foo':[], 'boo':[]}, [div2, div3]).then(function() {
-      div.setAttribute('foo', 'baz');
-      div.setAttribute('foo', 'bar2');
-
-      assertNothingReported().then(continueTesting);
-    });
-  });
+  div.setAttribute('foo', 'baz');
+  div.setAttribute('foo', 'bar2');
+  assertNothingReported();
 }
 
 function testElementFilterWithClassname() {
-  testCase.waitForAsync();
-
   var div = testDiv.appendChild(document.createElement('div'));
   div.setAttribute('class', 'foo');
 
@@ -968,59 +842,48 @@ function testElementFilterWithClassname() {
 
   var div3 = testDiv.appendChild(document.createElement('div'));
   div3.setAttribute('class', 'bar');
+  assertElementChanges([div2], [], undefined, undefined, []);
 
-  assertElementChanges([div2], [], undefined, undefined, []).then(function() {
+  testDiv.removeChild(div);
+  div2.removeAttribute('class');
+  div3.setAttribute('class', 'foo');
+  var div4 = testDiv.appendChild(document.createElement('div'));
+  div4.setAttribute('class', 'foobaz');
+  assertElementChanges([div3], [], undefined, undefined, [div, div2]);
 
-    testDiv.removeChild(div);
-    div2.removeAttribute('class');
-    div3.setAttribute('class', 'foo');
-    var div4 = testDiv.appendChild(document.createElement('div'));
-    div4.setAttribute('class', 'foobaz');
-
-    assertElementChanges([div3], [], undefined, undefined, [div, div2]).then(function() {
-      div3.setAttribute('class', 'bar');
-      div3.setAttribute('class', 'foo bar');
-
-      assertNothingReported().then(continueTesting);
-    });
-  });
+  div3.setAttribute('class', 'bar');
+  div3.setAttribute('class', 'foo bar');
+  assertNothingReported();
 }
 
 function testNoValidator() {
   var validator = MutationSummary.createQueryValidator;
   MutationSummary.createQueryValidator = undefined;
-  testCase.waitForAsync();
 
   startObserving();
 
   var div = testDiv.appendChild(document.createElement('div'));
   var span = div.appendChild(document.createElement('span'));
-  assertSubtreeChanges([div, span], [], [], []).then(function() {
+  assertSubtreeChanges([div, span], [], [], []);
 
-    div.removeChild(span);
-    assertSubtreeChanges([], [], [], [span]).then(continueTesting);
-  });
+  div.removeChild(span);
+  assertSubtreeChanges([], [], [], [span]);
 
   MutationSummary.createQueryValidator = validator;
 }
 
 function testAddRemoveBasic() {
-  testCase.waitForAsync();
-
   startObserving();
 
   var div = testDiv.appendChild(document.createElement('div'));
   var span = div.appendChild(document.createElement('span'));
-  assertSubtreeChanges([div, span], [], [], []).then(function() {
+  assertSubtreeChanges([div, span], [], [], []);
 
-    div.removeChild(span);
-    assertSubtreeChanges([], [], [], [span]).then(continueTesting);
-  });
+  div.removeChild(span);
+  assertSubtreeChanges([], [], [], [span]);
 }
 
 function testSequentialRemovals() {
-  testCase.waitForAsync();
-
   var div = testDiv.appendChild(document.createElement('div'));
 
   startObserving();
@@ -1030,14 +893,10 @@ function testSequentialRemovals() {
   div2.appendChild(div);
   testDiv.appendChild(div2);
   div2.removeChild(div);
-
-  assertSubtreeChanges([div2], [], [], [div]).then(continueTesting);
+  assertSubtreeChanges([div2], [], [], [div]);
 }
 
 function testAddAndRemoveOutsideTree() {
-  testCase.waitForAsync();
-
-  // Setup
   var div1 = testDiv.appendChild(document.createElement('div'));
   var div2 = div1.appendChild(document.createElement('div'));
   var span = div2.appendChild(document.createElement('span'));
@@ -1048,18 +907,14 @@ function testAddAndRemoveOutsideTree() {
   div1.appendChild(document.createElement('span'));
   div1.removeChild(div2);
   div2.removeChild(span);
-  assertSubtreeChanges([], [], [], [div1, div2, span]).then(function() {
+  assertSubtreeChanges([], [], [], [div1, div2, span]);
 
-    // This add will be ignored because it happens outside the document tree.
-    div1.appendChild(document.createElement('span'));
-    assertSubtreeChanges([], [], [], []).then(continueTesting);
-  });
+  // This add will be ignored because it happens outside the document tree.
+  div1.appendChild(document.createElement('span'));
+  assertNothingReported();
 }
 
 function testAddOutsideOfTreeAndReinsert() {
-  testCase.waitForAsync();
-
-  // Setup
   var div1 = testDiv.appendChild(document.createElement('div'));
 
   startObserving();
@@ -1068,13 +923,10 @@ function testAddOutsideOfTreeAndReinsert() {
   // and 'add' because the parent node is later replaced.
   var span = div1.appendChild(document.createElement('span'));
   testDiv.appendChild(div1);
-  assertSubtreeChanges([span], [], [], []).then(continueTesting);
+  assertSubtreeChanges([span], [], [], []);
 }
 
 function testMove() {
-  testCase.waitForAsync();
-
-  // Setup
   var div1 = testDiv.appendChild(document.createElement('div'));
   var div2 = div1.appendChild(document.createElement('div'));
   var span = div2.appendChild(document.createElement('span'));
@@ -1085,28 +937,20 @@ function testMove() {
   div1.removeChild(div2);
   testDiv.appendChild(div2);
   testDiv.appendChild(div1);
-
-  assertSubtreeChanges([], [div2], [], []).then(continueTesting);
+  assertSubtreeChanges([], [div2], [], []);
 }
 
 function testAddingToDetachedSubtree() {
-  testCase.waitForAsync();
-
-  // Setup
   var div1 = testDiv.appendChild(document.createElement('div'));
 
   startObserving();
   testDiv.removeChild(div1);
   var div2 = div1.appendChild(document.createElement('div'));
   var span = div2.appendChild(document.createElement('span'));
-
-  assertSubtreeChanges([], [], [], [div1]).then(continueTesting);
+  assertSubtreeChanges([], [], [], [div1]);
 }
 
 function testReorderInsideTree() {
-  testCase.waitForAsync();
-
-  // Setup
   var div1 = testDiv.appendChild(document.createElement('div'));
   var div2 = div1.appendChild(document.createElement('div'));
   var div3 = div2.appendChild(document.createElement('div'));
@@ -1119,14 +963,10 @@ function testReorderInsideTree() {
   testDiv.appendChild(div3);
   div3.appendChild(div2);
   div2.appendChild(div1);
-
-  assertSubtreeChanges([], [div1, div2, div3], [], []).then(continueTesting);
+  assertSubtreeChanges([], [div1, div2, div3], [], []);
 }
 
 function testReorderInsideTreeAndAddMiddle() {
-  testCase.waitForAsync();
-
-  // Setup
   var div1 = testDiv.appendChild(document.createElement('div'));
   var div2 = div1.appendChild(document.createElement('div'));
   var div3 = div2.appendChild(document.createElement('div'));
@@ -1141,14 +981,10 @@ function testReorderInsideTreeAndAddMiddle() {
   var div4 = document.createElement('div');
   div2.appendChild(div4);
   div4.appendChild(div1);
-
-  assertSubtreeChanges([div4], [div1, div2, div3], [], []).then(continueTesting);
+  assertSubtreeChanges([div4], [div1, div2, div3], [], []);
 }
 
 function testReorderOutsideTree() {
-  testCase.waitForAsync();
-
-  // Setup
   var div1 = document.createElement('div');
   var div2 = div1.appendChild(document.createElement('div'));
   var div3 = div2.appendChild(document.createElement('div'));
@@ -1160,13 +996,10 @@ function testReorderOutsideTree() {
   div3.appendChild(div2);
   div2.appendChild(div1);
 
-  assertSubtreeChanges([], [], [], []).then(continueTesting);
+  assertNothingReported();
 }
 
 function testReorderAndRemoveFromTree() {
-  testCase.waitForAsync();
-
-  // Setup
   var div1 = testDiv.appendChild(document.createElement('div'));
   var div2 = div1.appendChild(document.createElement('div'));
   var div3 = div2.appendChild(document.createElement('div'));
@@ -1178,14 +1011,10 @@ function testReorderAndRemoveFromTree() {
   div2.removeChild(div3);
   div3.appendChild(div2);
   div2.appendChild(div1);
-
-  assertSubtreeChanges([], [], [], [div1, div2, div3]).then(continueTesting);
+  assertSubtreeChanges([], [], [], [div1, div2, div3]);
 }
 
 function testReorderAndRemoveSubtree() {
-  testCase.waitForAsync();
-
-  // Setup
   var div1 = testDiv.appendChild(document.createElement('div'));
   var div2 = div1.appendChild(document.createElement('div'));
 
@@ -1195,14 +1024,10 @@ function testReorderAndRemoveSubtree() {
   testDiv.appendChild(div2);
   div2.appendChild(div1);
   div2.removeChild(div1);
-
-  assertSubtreeChanges([], [div2], [], [div1]).then(continueTesting);
+  assertSubtreeChanges([], [div2], [], [div1]);
 }
 
 function testReorderOutsideAndAddToTree() {
-  testCase.waitForAsync();
-
-  // Setup
   var div1 = document.createElement('div');
   var div2 = div1.appendChild(document.createElement('div'));
   var div3 = div2.appendChild(document.createElement('div'));
@@ -1214,14 +1039,10 @@ function testReorderOutsideAndAddToTree() {
   div3.appendChild(div2);
   div2.appendChild(div1);
   testDiv.appendChild(div3);
-
-  assertSubtreeChanges([div1, div2, div3], [], [], []).then(continueTesting);
+  assertSubtreeChanges([div1, div2, div3], [], [], []);
 }
 
 function testReorderOutsideAndAddSubtree() {
-  testCase.waitForAsync();
-
-  // Setup
   var div1 = document.createElement('div');
   var div2 = div1.appendChild(document.createElement('div'));
 
@@ -1230,14 +1051,10 @@ function testReorderOutsideAndAddSubtree() {
   div1.removeChild(div2);
   div2.appendChild(div1);
   testDiv.appendChild(div2);
-
-  assertSubtreeChanges([div1, div2], [], [], []).then(continueTesting);
+  assertSubtreeChanges([div1, div2], [], [], []);
 }
 
 function testRemoveSubtreeAndAddToExternal() {
-  testCase.waitForAsync();
-
-  // Setup
   var div1 = testDiv.appendChild(document.createElement('div'));
   var div2 = div1.appendChild(document.createElement('div'));
   var div3 = document.createElement('div');
@@ -1245,8 +1062,7 @@ function testRemoveSubtreeAndAddToExternal() {
   startObserving();
   testDiv.removeChild(div1);
   div3.appendChild(div1);
-
-  assertSubtreeChanges([], [], [], [div1, div2]).then(continueTesting);
+  assertSubtreeChanges([], [], [], [div1, div2]);
 }
 
 function insertAfter(parent, node, refNode) {
@@ -1254,9 +1070,6 @@ function insertAfter(parent, node, refNode) {
 }
 
 function testMoveDetectNoop() {
-  testCase.waitForAsync();
-
-  // Setup
   var divA = testDiv.appendChild(document.createElement('div'));
   divA.id = 'a';
   var divB = testDiv.appendChild(document.createElement('div'));
@@ -1282,19 +1095,14 @@ function testMoveDetectNoop() {
   insertAfter(testDiv, divE, divG); // A [D  C  B  G  E] F
 
   // Final effect is A [D] C [B G] E F
+  assertSubtreeChanges([divG], [], [divD, divB], []);
 
-  assertSubtreeChanges([divG], [], [divD, divB], []).then(function() {
-    insertAfter(testDiv, divC, divA);
-    insertAfter(testDiv, divD, divA);
-
-    assertNothingReported().then(continueTesting);
-  });
+  insertAfter(testDiv, divC, divA);
+  insertAfter(testDiv, divD, divA);
+  assertNothingReported();
 }
 
 function testMoveDetectNoopSimple() {
-  testCase.waitForAsync();
-
-  // Setup
   var divA = testDiv.appendChild(document.createElement('div'));
   divA.id = 'a';
   var divB = testDiv.appendChild(document.createElement('div'));
@@ -1308,7 +1116,7 @@ function testMoveDetectNoopSimple() {
 
   // Final effect is B A
 
-  assertSubtreeChanges([], [], [divB], []).then(continueTesting);
+  assertSubtreeChanges([], [], [divB], []);
 }
 
 function testIgnoreOwnChanges() {
