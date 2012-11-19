@@ -42,17 +42,25 @@ var observer;
 var observing;
 var changed;
 var query;
+var options;
 
-function startObserving(q) {
+function startObserving(q, extraOptions) {
   query = q || { all: true };
-
-  observer = new MutationSummary({
+  options = {
     rootNode: testDiv,
     callback: function() {
       throw 'Mutation Delivered at end of microtask'
     },
     queries: [query]
-  });
+  }
+
+  if (extraOptions) {
+    Object.keys(extraOptions).forEach(function(key) {
+      options[key] = extraOptions[key];
+    });
+  }
+
+  observer = new MutationSummary(options);
 
   observing = true;
 }
@@ -83,27 +91,44 @@ function assertSummary(expect, opt_changed) {
   expect.reordered = expect.reordered || [];
   expect.attributeChanged = expect.attributeChanged || {};
 
+  // added, removed
   assert(typeof expect.added == typeof changed.added && typeof expect.removed == typeof changed.removed);
-  if (expect.added) {
-    compareNodeArrayIgnoreOrder(expect.added, changed.added);
-    compareNodeArrayIgnoreOrder(expect.removed, changed.removed);
+  compareNodeArrayIgnoreOrder(expect.added, changed.added);
+  compareNodeArrayIgnoreOrder(expect.removed, changed.removed);
+
+  if (options.oldPreviousSibling) {
+    expect.removed.forEach(function(node, index) {
+      assertEquals(expect.removedOldPreviousSibling[index], changed.getOldPreviousSibling(node));
+    });
   }
 
+  // reparented
   if (query.all || query.element) {
     assert(typeof expect.reparented === typeof changed.reparented);
-    if (expect.reparented)
-      compareNodeArrayIgnoreOrder(expect.reparented, changed.reparented);
+    compareNodeArrayIgnoreOrder(expect.reparented, changed.reparented);
 
-    if (query.all) {
-      assert(typeof expect.reordered == typeof changed.reordered);
-      compareNodeArrayIgnoreOrder(expect.reordered, changed.reordered);
-    } else {
-      compareNodeArrayIgnoreOrder(expect.reordered, []);
+    if (options.oldPreviousSibling) {
+      expect.reparented.forEach(function(node, index) {
+        assertEquals(expect.reparentedOldPreviousSibling[index], changed.getOldPreviousSibling(node));
+      });
     }
   } else {
     assertUndefined(changed.reparented);
   }
 
+  // reordered
+  if (query.all) {
+    assert(typeof expect.reordered == typeof changed.reordered);
+    compareNodeArrayIgnoreOrder(expect.reordered, changed.reordered);
+
+    expect.reordered.forEach(function(node, index) {
+      assertEquals(expect.reorderedOldPreviousSibling[index], changed.getOldPreviousSibling(node));
+    });
+  } else {
+    assertUndefined(changed.reordered);
+  }
+
+  // valueChanged
   if (query.attribute || query.characterData) {
     assert(typeof expect.valueChanged == typeof changed.valueChanged);
     compareNodeArrayIgnoreOrder(expect.valueChanged, changed.valueChanged);
@@ -116,6 +141,7 @@ function assertSummary(expect, opt_changed) {
     assertUndefined(changed.valueChanged);
   }
 
+  // attributeChanged
   if (query.all || query.elementAttributes) {
     assert(typeof expect.attributeChanged == typeof changed.attributeChanged);
     assertEquals(Object.keys(expect.attributeChanged).length, Object.keys(changed.attributeChanged).length);
@@ -444,6 +470,13 @@ function testOptionsValidation() {
   new MutationSummary({
     callback: function() {},
     queries: [{ element: 'div', elementAttributes: "foo bar" }]
+  });
+
+  // Valid element request 4.
+  new MutationSummary({
+    callback: function() {},
+    oldPreviousSibling: true,
+    queries: [{ element: 'div, span[foo]' }]
   });
 
   // elementFilter doesn't support descendant selectors.
@@ -1002,7 +1035,7 @@ function testAddOutsideOfTreeAndReinsert() {
   });
 }
 
-function testMove() {
+function testReparented() {
   var div1 = testDiv.appendChild(document.createElement('div'));
   var div2 = div1.appendChild(document.createElement('div'));
   var span = div2.appendChild(document.createElement('span'));
@@ -1044,7 +1077,24 @@ function testReorderInsideTree() {
   div3.appendChild(div2);
   div2.appendChild(div1);
   assertSummary({
-    reparented: [div1, div2, div3]
+    reparented: [ div1, div2, div3 ]
+  });
+}
+
+function testRemovedOldPreviousSibling() {
+  var div1 = testDiv.appendChild(document.createElement('div'));
+  var div2 = testDiv.appendChild(document.createElement('div'));
+  var div3 = testDiv.appendChild(document.createElement('div'));
+
+  startObserving(undefined, { oldPreviousSibling: true });
+
+  testDiv.removeChild(div1);
+  testDiv.removeChild(div2);
+  testDiv.removeChild(div3);
+
+  assertSummary({
+    removed: [ div1, div2, div3 ],
+    removedOldPreviousSibling:[ null, div1, div2 ]
   });
 }
 
@@ -1165,6 +1215,49 @@ function insertAfter(parent, node, refNode) {
   parent.insertBefore(node, refNode ? refNode.nextSibling : parent.firstChild);
 }
 
+function testMove() {
+  var divA = testDiv.appendChild(document.createElement('div'));
+  divA.id = 'a';
+  var divB = testDiv.appendChild(document.createElement('div'));
+  divB.id = 'b';
+  var divC = testDiv.appendChild(document.createElement('div'));
+  divC.id = 'c';
+  var divD = testDiv.appendChild(document.createElement('div'));
+  divD.id = 'd';
+
+  startObserving();                 // A  B  C  D
+
+  insertAfter(testDiv, divB, null); // [B] A  C  D
+  insertAfter(testDiv, divC, null); // [C  B] A  D
+  insertAfter(testDiv, divD, null); // [D  C  B] A
+
+  // Final effect is [D  C  B] A
+  assertSummary({
+    reordered: [divD, divC, divB],
+    reorderedOldPreviousSibling: [divC, divB, divA]
+  });
+}
+
+function testMove2() {
+  var divA = testDiv.appendChild(document.createElement('div'));
+  divA.id = 'a';
+  var divB = testDiv.appendChild(document.createElement('div'));
+  divB.id = 'b';
+  var divC = testDiv.appendChild(document.createElement('div'));
+  divC.id = 'c';
+
+  startObserving();                 // A  B  C
+
+  insertAfter(testDiv, divA, divC); // B  C [A]
+  insertAfter(testDiv, divB, divA); // C [A  B]
+
+  // Final effect is C [A B]
+  assertSummary({
+    reordered: [divA, divB],
+    reorderedOldPreviousSibling: [null, divA]
+  });
+}
+
 function testMoveDetectNoop() {
   var divA = testDiv.appendChild(document.createElement('div'));
   divA.id = 'a';
@@ -1190,10 +1283,11 @@ function testMoveDetectNoop() {
   insertAfter(testDiv, divG, divE); // A [D  C  B] E [G] F
   insertAfter(testDiv, divE, divG); // A [D  C  B  G  E] F
 
-  // Final effect is A [D] C [B G] E F
+  // Final effect is A D [C B G] E F
   assertSummary({
     added: [divG],
-    reordered: [divD, divB]
+    reordered: [divB, divC],
+    reorderedOldPreviousSibling: [divA, divB]
   });
 
   insertAfter(testDiv, divC, divA);
@@ -1213,9 +1307,10 @@ function testMoveDetectNoopSimple() {
   insertAfter(testDiv, divB, divA); // [A B]
   insertAfter(testDiv, divA, divB); // [B A]
 
-  // Final effect is B A
+  // Final effect is B [A]
   assertSummary({
-    reordered: [divB]
+    reordered: [divA],
+    reorderedOldPreviousSibling: [null]
   });
 }
 

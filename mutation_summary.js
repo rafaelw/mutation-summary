@@ -107,10 +107,11 @@
 
   var forEach = Array.prototype.forEach.call.bind(Array.prototype.forEach);
 
-  function MutationProjection(rootNode, elementFilter, calcReordered) {
+  function MutationProjection(rootNode, elementFilter, calcReordered, calcOldPreviousSibling) {
     this.rootNode = rootNode;
     this.elementFilter = elementFilter;
     this.calcReordered = calcReordered;
+    this.calcOldPreviousSibling = calcOldPreviousSibling;
   }
 
   MutationProjection.prototype = {
@@ -244,12 +245,17 @@
           entered.push(node);
         } else if (reachable == EXITED) {
           exited.push(node);
+          if (self.calcOldPreviousSibling)
+            wasReordered(node);
+
         } else if (reachable == STAYED_IN) {
           var movement = STAYED_IN;
 
           if (change && change.childList) {
             if (change.oldParentNode !== node.parentNode) {
               movement = REPARENTED;
+              if (self.calcOldPreviousSibling)
+                wasReordered(node);
             } else if (self.calcReordered && wasReordered(node)) {
               movement = REORDERED;
             }
@@ -317,11 +323,16 @@
     },
 
     getOldPreviousSibling: function(node) {
-      var change = this.childlistChanges.get(node.parentNode);
-      if (!change || !this.wasReordered(node))
+      var parentNode = node.parentNode;
+      var change = this.changeMap.get(node);
+      if (change && change.oldParentNode)
+        parentNode = change.oldParentNode;
+
+      change = this.childlistChanges.get(parentNode);
+      if (!change)
         throw Error('getOldPreviousSibling requested on invalid node.');
 
-      return change.oldPreviousSibling.get(node);
+      return change.oldPrevious.get(node);
     },
 
     getOldAttribute: function(element, attrName) {
@@ -741,22 +752,17 @@
 
       this.processChildlistChanges();
 
-      var change = this.childlistChanges.get(node.parentNode);
+      var parentNode = node.parentNode;
+      var change = this.changeMap.get(node);
+      if (change && change.oldParentNode)
+        parentNode = change.oldParentNode;
+
+      change = this.childlistChanges.get(parentNode);
       if (change.moved)
         return change.moved.get(node);
 
       var moved = change.moved = new NodeMap;
       var pendingMoveDecision = new NodeMap;
-
-      function isFirstOfPending(node) {
-        // Ensure that the result is deterministic.
-        while (node = node.previousSibling) {
-          if (pendingMoveDecision.has(node))
-            return false;
-        }
-
-        return true;
-      }
 
       function isMoved(node) {
         if (!node)
@@ -769,7 +775,7 @@
           return didMove;
 
         if (pendingMoveDecision.has(node)) {
-          didMove = isFirstOfPending(node);
+          didMove = true;
         } else {
           pendingMoveDecision.set(node, true);
           didMove = getPrevious(node) !== getOldPrevious(node);
@@ -1275,6 +1281,7 @@
       'callback': true, // required
       'queries': true,  // required
       'rootNode': true,
+      'oldPreviousSibling': true,
       'observeOwnChanges': true
     };
 
@@ -1291,6 +1298,7 @@
     opts.callback = options.callback;
     opts.rootNode = options.rootNode || document;
     opts.observeOwnChanges = options.observeOwnChanges;
+    opts.oldPreviousSibling = options.oldPreviousSibling;
 
     if (!options.queries || !options.queries.length)
       throw Error('Invalid options: queries must contain at least one query request object.');
@@ -1541,7 +1549,7 @@
       if (!mutations || !mutations.length)
         return [];
 
-      var projection = new MutationProjection(root, elementFilter, calcReordered);
+      var projection = new MutationProjection(root, elementFilter, calcReordered, options.oldPreviousSibling);
       projection.processMutations(mutations);
 
       return options.queries.map(function(query) {
