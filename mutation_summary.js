@@ -222,6 +222,31 @@
       var visited = new NodeMap;
       var self = this;
 
+      function ensureHasOldPreviousSiblingIfNeeded(node) {
+        if (!self.calcOldPreviousSibling)
+          return;
+
+        self.processChildlistChanges();
+
+        var parentNode = node.parentNode;
+        var change = self.changeMap.get(node);
+        if (change && change.oldParentNode)
+          parentNode = change.oldParentNode;
+
+        change = self.childlistChanges.get(parentNode);
+        if (!change) {
+          change = {
+            oldPrevious: new NodeMap
+          };
+
+          self.childlistChanges.set(parentNode, change);
+        }
+
+        if (!change.oldPrevious.has(node)) {
+          change.oldPrevious.set(node, node.previousSibling);
+        }
+      }
+
       function visitNode(node, parentReachable) {
         if (visited.has(node))
           return;
@@ -245,8 +270,7 @@
           entered.push(node);
         } else if (reachable == EXITED) {
           exited.push(node);
-          if (self.calcOldPreviousSibling)
-            wasReordered(node);
+          ensureHasOldPreviousSiblingIfNeeded(node);
 
         } else if (reachable == STAYED_IN) {
           var movement = STAYED_IN;
@@ -254,8 +278,7 @@
           if (change && change.childList) {
             if (change.oldParentNode !== node.parentNode) {
               movement = REPARENTED;
-              if (self.calcOldPreviousSibling)
-                wasReordered(node);
+              ensureHasOldPreviousSiblingIfNeeded(node);
             } else if (self.calcReordered && wasReordered(node)) {
               movement = REORDERED;
             }
@@ -693,12 +716,13 @@
       }
 
       var reachabilityChange = this.reachabilityChange.bind(this);
+      var self = this;
 
       this.mutations.forEach(function(mutation) {
         if (mutation.type != 'childList')
           return;
 
-        if (reachabilityChange(mutation.target) != STAYED_IN)
+        if (reachabilityChange(mutation.target) != STAYED_IN && !self.calcOldPreviousSibling)
           return;
 
         var change = getChildlistChange(mutation.target);
@@ -794,7 +818,7 @@
         return didMove;
       }
 
-      var oldPreviousCache = change.oldPreviousSibling = new NodeMap;
+      var oldPreviousCache = new NodeMap;
       function getOldPrevious(node) {
         var oldPrevious = oldPreviousCache.get(node);
         if (oldPrevious !== undefined)

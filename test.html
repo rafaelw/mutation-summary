@@ -1085,6 +1085,8 @@ function testRemovedOldPreviousSibling() {
   var div1 = testDiv.appendChild(document.createElement('div'));
   var div2 = testDiv.appendChild(document.createElement('div'));
   var div3 = testDiv.appendChild(document.createElement('div'));
+  var div4 = div3.appendChild(document.createElement('div'));
+  var div5 = div3.appendChild(document.createElement('div'));
 
   startObserving(undefined, { oldPreviousSibling: true });
 
@@ -1093,8 +1095,8 @@ function testRemovedOldPreviousSibling() {
   testDiv.removeChild(div3);
 
   assertSummary({
-    removed: [ div1, div2, div3 ],
-    removedOldPreviousSibling:[ null, div1, div2 ]
+    removed: [ div1, div2, div3, div4, div5 ],
+    removedOldPreviousSibling:[ null, div1, div2, null, div4 ]
   });
 }
 
