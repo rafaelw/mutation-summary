@@ -30,6 +30,7 @@ goog.require('goog.testing.AsyncTestCase');
   <div id="test-div"></div>
 
 <script>
+"use strict";
 
 var testCase = goog.testing.AsyncTestCase.createAndInstall(document.title);
 testCase.stepTimeout = 5 * 1000;
@@ -40,9 +41,10 @@ var testDiv;
 var observer;
 var observing;
 var changed;
+var query;
 
-function startObserving(query) {
-  query = query || { all: true };
+function startObserving(q) {
+  query = q || { all: true };
 
   observer = new MutationSummary({
     rootNode: testDiv,
@@ -72,77 +74,61 @@ function tearDown() {
   testDiv.textContent = '';
 }
 
-function assertSubtreeChanges(expectAdded,
-                              expectReparented,
-                              expectReordered,
-                              expectRemoved) {
-  var changed = observer.takeSummaries()[0];
-  compareNodeArrayIgnoreOrder(expectAdded, changed.added);
-  compareNodeArrayIgnoreOrder(expectRemoved, changed.removed);
+function assertSummary(expect, opt_changed) {
+  var changed = opt_changed ? opt_changed[0] : observer.takeSummaries()[0];
 
-  assert(typeof expectReparented === typeof changed.reparented);
-  if (expectReparented)
-    compareNodeArrayIgnoreOrder(expectReparented, changed.reparented);
+  expect.added = expect.added || [];
+  expect.removed = expect.removed || [];
+  expect.reparented = expect.reparented || [];
+  expect.reordered = expect.reordered || [];
+  expect.attributeChanged = expect.attributeChanged || {};
 
-  assert(typeof expectReordered === typeof changed.reordered);
-  if (expectReordered)
-    compareNodeArrayIgnoreOrder(expectReordered, changed.reordered);
-}
+  assert(typeof expect.added == typeof changed.added && typeof expect.removed == typeof changed.removed);
+  if (expect.added) {
+    compareNodeArrayIgnoreOrder(expect.added, changed.added);
+    compareNodeArrayIgnoreOrder(expect.removed, changed.removed);
+  }
 
-function assertElementChanges(expectAdded,
-                              expectReparented,
-                              expectChangedNodes,
-                              expectOldValues,
-                              expectRemoved,
-                              opt_summaries) {
-  var changed = opt_summaries ? opt_summaries[0] : observer.takeSummaries()[0];
+  if (query.all || query.element) {
+    assert(typeof expect.reparented === typeof changed.reparented);
+    if (expect.reparented)
+      compareNodeArrayIgnoreOrder(expect.reparented, changed.reparented);
 
-  compareNodeArrayIgnoreOrder(expectAdded, changed.added);
-  compareNodeArrayIgnoreOrder(expectRemoved, changed.removed);
-  compareNodeArrayIgnoreOrder(expectReparented, changed.reparented);
-  assertFalse(changed.hasOwnProperty('reordered'));
+    if (query.all) {
+      assert(typeof expect.reordered == typeof changed.reordered);
+      compareNodeArrayIgnoreOrder(expect.reordered, changed.reordered);
+    } else {
+      compareNodeArrayIgnoreOrder(expect.reordered, []);
+    }
+  } else {
+    assertUndefined(changed.reparented);
+  }
 
-  assert(typeof expectChangedNodes === typeof changed.attributeChanged);
-  if (expectChangedNodes) {
-    assertEquals(Object.keys(expectChangedNodes).length, Object.keys(changed.attributeChanged).length);
+  if (query.attribute || query.characterData) {
+    assert(typeof expect.valueChanged == typeof changed.valueChanged);
+    compareNodeArrayIgnoreOrder(expect.valueChanged, changed.valueChanged);
+    var getOldFunction = query.attribute ? 'getOldAttribute' : 'getOldCharacterData';
 
-    Object.keys(expectChangedNodes).forEach(function(attrName) {
-      compareNodeArrayIgnoreOrder(expectChangedNodes[attrName], changed.attributeChanged[attrName]);
-      expectOldValues[attrName].forEach(function(attrOldValue, index) {
-        assertEquals(expectOldValues[attrName][index], changed.getOldAttribute(expectChangedNodes[attrName][index], attrName));
+    expect.valueChanged.forEach(function(node, index) {
+      assertEquals(expect.oldValues[index], changed[getOldFunction](node));
+    });
+  } else {
+    assertUndefined(changed.valueChanged);
+  }
+
+  if (query.all || query.elementAttributes) {
+    assert(typeof expect.attributeChanged == typeof changed.attributeChanged);
+    assertEquals(Object.keys(expect.attributeChanged).length, Object.keys(changed.attributeChanged).length);
+
+    Object.keys(expect.attributeChanged).forEach(function(attrName) {
+      compareNodeArrayIgnoreOrder(expect.attributeChanged[attrName], changed.attributeChanged[attrName]);
+      expect.attributeOldValue[attrName].forEach(function(attrOldValue, index) {
+        assertEquals(expect.attributeOldValue[attrName][index], changed.getOldAttribute(expect.attributeChanged[attrName][index], attrName));
       });
     });
+  } else {
+    assertUndefined(changed.attributeChanged);
   }
-}
-
-function assertAttributeChanges(expectAddedNodes, expectChangedNodes, expectOldValues, expectRemovedNodes) {
-  var changed = observer.takeSummaries()[0];
-
-  compareNodeArrayIgnoreOrder(expectAddedNodes, changed.added);
-  compareNodeArrayIgnoreOrder(expectChangedNodes, changed.valueChanged);
-  compareNodeArrayIgnoreOrder(expectRemovedNodes, changed.removed);
-  assertFalse(changed.hasOwnProperty('reparented'));
-  assertFalse(changed.hasOwnProperty('reordered'));
-
-  expectChangedNodes.forEach(function(node, index) {
-    assertEquals(expectOldValues[index], changed.getOldAttribute(node));
-  });
-}
-
-function assertCharacterDataChanges(expectAddedNodes,
-                                    expectChangedNodes,
-                                    expectOldValues,
-                                    expectRemovedNodes) {
-  var changed = observer.takeSummaries()[0];
-
-  compareNodeArrayIgnoreOrder(expectAddedNodes, changed.added);
-  compareNodeArrayIgnoreOrder(expectChangedNodes, changed.valueChanged);
-  compareNodeArrayIgnoreOrder(expectRemovedNodes, changed.removed);
-
-  expectChangedNodes.forEach(function(node, index) {
-    assertEquals(expectOldValues[index],
-                 changed.getOldCharacterData(expectChangedNodes[index]));
-  });
 }
 
 function assertNothingReported() {
@@ -563,11 +549,17 @@ function testDisconnectReconnect() {
   observer.reconnect();
 
   // summaries returned from disconnect are handed in.
-  assertElementChanges([], [], { 'foo': [div], 'bar': [] }, { 'foo': ['1'], 'bar':[] }, [], summaries);
-  div.setAttribute('foo', '3');
+  assertSummary({
+    attributeChanged: { 'foo': [div], 'bar': [] },
+    attributeOldValue: { 'foo': ['1'], 'bar':[] }
+  }, summaries);
 
+  div.setAttribute('foo', '3');
   // change to 'bar' should never be reported.
-  assertElementChanges([], [], { 'foo': [div], 'bar': [] }, { 'foo': ['2'], 'bar':[] }, []);
+  assertSummary({
+    attributeChanged: { 'foo': [div], 'bar': [] },
+    attributeOldValue: { 'foo': ['2'], 'bar':[] }
+  });
 }
 
 function testAttributeBasic() {
@@ -587,13 +579,22 @@ function testAttributeBasic() {
   div2.setAttribute('foo', 'baz');
   testDiv.appendChild(div3);
   div3.setAttribute('foo', 'bat2');
-  assertAttributeChanges([div2, div3], [div], ['bar'], [])
+  assertSummary({
+    added: [div2, div3],
+    valueChanged: [div],
+    oldValues: ['bar']
+  });
 
   div3.setAttribute('foo', 'bat3');
   testDiv.removeChild(div3);
   testDiv.removeChild(div);
   div2.setAttribute('foo', 'baz2');
-  assertAttributeChanges([], [div2], ['baz'], [div3, div]);
+  assertSummary({
+    added: [],
+    removed: [div3, div],
+    valueChanged: [div2],
+    oldValues: ['baz']
+  });
 
   div2.removeAttribute('foo');
   div2.setAttribute('foo', 'baz2');
@@ -617,13 +618,22 @@ function testAttributeCaseInsensitive() {
   div2.setAttribute('foo', 'baz');
   testDiv.appendChild(div3);
   div3.setAttribute('foo', 'bat2');
-  assertAttributeChanges([div2, div3], [div], ['bar'], []);
+  assertSummary({
+    added: [div2, div3],
+    valueChanged: [div],
+    oldValues: ['bar']
+  });
 
   div3.setAttribute('foo', 'bat3');
   testDiv.removeChild(div3);
   testDiv.removeChild(div);
   div2.setAttribute('foo', 'baz2');
-  assertAttributeChanges([], [div2], ['baz'], [div3, div]);
+  assertSummary({
+    added: [],
+    removed: [div3, div],
+    valueChanged: [div2],
+    oldValues: ['baz']
+  });
 
   div2.removeAttribute('foo');
   div2.setAttribute('foo', 'baz2');
@@ -645,12 +655,20 @@ function testCharacterDataBasic() {
   var comment2 = div.appendChild(document.createComment('456'));
   comment2.textContent = '789';
   var div2 = testDiv.appendChild(document.createElement('div'));
-  assertCharacterDataChanges([comment2], [text, comment], ['foo', '123'], []);
+  assertSummary({
+    added: [comment2],
+    valueChanged: [text, comment],
+    oldValues: ['foo', '123']
+  });
 
   text.textContent = 'baz';
   text.textContent = 'bat';
   div.removeChild(comment2);
-  assertCharacterDataChanges([], [text], ['bar'], [comment2]);
+  assertSummary({
+    removed: [comment2],
+    valueChanged: [text],
+    oldValues: ['bar']
+  });
 
   text.textContent = 'bar';
   text.textContent = 'bat'; // Restoring its original value should mean
@@ -666,7 +684,9 @@ function testElementFilterBasic() {
   var div = testDiv.appendChild(document.createElement('div'));
   var span = div.appendChild(document.createElement('span'));
   var p = testDiv.appendChild(document.createElement('P'));
-  assertElementChanges([div, p], [], undefined, undefined, []);
+  assertSummary({
+    added: [div, p]
+  });
 
   testDiv.removeChild(div);
   testDiv.appendChild(div);
@@ -688,7 +708,9 @@ function testElementFilterAttributeSpecified() {
   var span = div.appendChild(document.createElement('span'));
   var p = testDiv.appendChild(document.createElement('P'));
   p.setAttribute('baz', 'baz');
-  assertElementChanges([div], [], undefined, undefined, []);
+  assertSummary({
+    added: [div]
+  });
 
   div.removeAttribute('foo');
   p.removeAttribute('baz');
@@ -696,7 +718,10 @@ function testElementFilterAttributeSpecified() {
   div3.setAttribute('baz', 'bat');
   span.id = 'foo';
   span.setAttribute('blow', 'blarg bloog');
-  assertElementChanges([p, div3, span], [], undefined, undefined, [div]);
+  assertSummary({
+    added: [p, div3, span],
+    removed: [div]
+  });
 
   div3.removeAttribute('baz');
   div3.setAttribute('baz', 'bat');
@@ -714,7 +739,11 @@ function testCaseInsensitiveElementAttributes() {
 
   div.setAttribute('FOO', 'FOO');
   div.setAttribute('bar', 'bar');
-  assertElementChanges([], [], {'foo': [div], 'BAR': [div]}, {'foo': [null], 'BAR': [null] }, []);
+
+  assertSummary({
+    attributeChanged: { 'foo': [div], 'BAR': [div] },
+    attributeOldValue: { 'foo': [null], 'BAR': [null] }
+  });
 }
 
 function testElementFilterHTMLCaseInsensitive2() {
@@ -733,7 +762,11 @@ function testElementFilterHTMLCaseInsensitive2() {
   var span = div.appendChild(document.createElement('span'));
   var p = testDiv.appendChild(document.createElement('P'));
   p.setAttribute('baz', 'baz');
-  assertElementChanges([div], [], {'FOO': []}, {'FOO':[]}, []);
+  assertSummary({
+    added: [div],
+    attributeChanged: { 'FOO': [] },
+    attributeOldValue: { 'FOO':[] }
+  });
 
   div.setAttribute('foo', 'blarg');
 
@@ -742,7 +775,11 @@ function testElementFilterHTMLCaseInsensitive2() {
   div3.setAttribute('baz', 'bat');
   span.id = 'foo';
   span.setAttribute('bloW', 'blarg bloog');
-  assertElementChanges([p, div3, span], [], {'FOO':[div]}, {'FOO':['foo']}, []);
+  assertSummary({
+    added: [p, div3, span],
+    attributeChanged: { 'FOO':[div] },
+    attributeOldValue: { 'FOO':['foo'] }
+  });
 
   div3.removeAttribute('baz');
   div3.setAttribute('baz', 'bat');
@@ -773,7 +810,11 @@ function testElementFilterSVGCaseSensitive() {
   var upperSpan = div.appendChild(div.appendChild(svgDoc.createElementNS('http://www.w3.org/2000/svg', 'SPAN')));
   var p = testDiv.appendChild(svgDoc.createElement('P'));
   p.setAttribute('bar', 'baz');
-  assertElementChanges([div2, p], [], {'FOO':[]}, {'FOO':[]}, []);
+  assertSummary({
+    added: [div2, p],
+    attributeChanged: { 'FOO':[] },
+    attributeOldValue: { 'FOO':[] }
+  });
 
   div2.setAttribute('foo', 'bar');
 
@@ -785,7 +826,12 @@ function testElementFilterSVGCaseSensitive() {
   // Note: SVG Elements aren't HTMLElements, so el.id doesn't delegate to the 'id' attribute.
   upperSpan.setAttribute('id', 'foo');
   upperSpan.setAttribute('Blow', 'blarg bloog');
-  assertElementChanges([div3, upperSpan], [], {'FOO': []}, {'FOO': []}, [p]);
+  assertSummary({
+    added: [div3, upperSpan],
+    removed: [p],
+    attributeChanged: { 'FOO':[] },
+    attributeOldValue: { 'FOO':[] }
+  });
 
   div3.removeAttribute('baz');
   div3.setAttribute('baz', 'bat');
@@ -815,12 +861,22 @@ function testElementFilterWithElementAttributes() {
   var div3 = testDiv.appendChild(document.createElement('div'));
   div3.setAttribute('baz', 'bar');
   div2.appendChild(div);
-  assertElementChanges([div2, div3], [div], { 'foo': [div], 'boo': [] }, { 'foo': ['bar'], 'boo':[] }, []);
+  assertSummary({
+    added: [div2, div3],
+    reparented: [div],
+    attributeChanged: { 'foo': [div], 'boo': [] },
+    attributeOldValue: { 'foo': ['bar'], 'boo':[] }
+  });
 
   testDiv.appendChild(div);
   div3.removeAttribute('baz');
   testDiv.removeChild(div2);
-  assertElementChanges([], [div], {'foo':[], 'boo':[]}, {'foo':[], 'boo':[]}, [div2, div3]);
+  assertSummary({
+    reparented: [div],
+    removed: [div2, div3],
+    attributeChanged: { 'foo':[], 'boo':[] },
+    attributeOldValue: { 'foo':[], 'boo':[] }
+  });
 
   div.setAttribute('foo', 'baz');
   div.setAttribute('foo', 'bar2');
@@ -842,14 +898,19 @@ function testElementFilterWithClassname() {
 
   var div3 = testDiv.appendChild(document.createElement('div'));
   div3.setAttribute('class', 'bar');
-  assertElementChanges([div2], [], undefined, undefined, []);
+  assertSummary({
+    added: [div2]
+  });
 
   testDiv.removeChild(div);
   div2.removeAttribute('class');
   div3.setAttribute('class', 'foo');
   var div4 = testDiv.appendChild(document.createElement('div'));
   div4.setAttribute('class', 'foobaz');
-  assertElementChanges([div3], [], undefined, undefined, [div, div2]);
+  assertSummary({
+    added: [div3],
+    removed: [div, div2]
+  });
 
   div3.setAttribute('class', 'bar');
   div3.setAttribute('class', 'foo bar');
@@ -864,10 +925,14 @@ function testNoValidator() {
 
   var div = testDiv.appendChild(document.createElement('div'));
   var span = div.appendChild(document.createElement('span'));
-  assertSubtreeChanges([div, span], [], [], []);
+  assertSummary({
+    added: [div, span]
+  });
 
   div.removeChild(span);
-  assertSubtreeChanges([], [], [], [span]);
+  assertSummary({
+    removed: [span]
+  });
 
   MutationSummary.createQueryValidator = validator;
 }
@@ -877,10 +942,14 @@ function testAddRemoveBasic() {
 
   var div = testDiv.appendChild(document.createElement('div'));
   var span = div.appendChild(document.createElement('span'));
-  assertSubtreeChanges([div, span], [], [], []);
+  assertSummary({
+    added: [div, span]
+  });
 
   div.removeChild(span);
-  assertSubtreeChanges([], [], [], [span]);
+  assertSummary({
+    removed: [span],
+  });
 }
 
 function testSequentialRemovals() {
@@ -893,7 +962,10 @@ function testSequentialRemovals() {
   div2.appendChild(div);
   testDiv.appendChild(div2);
   div2.removeChild(div);
-  assertSubtreeChanges([div2], [], [], [div]);
+  assertSummary({
+    added: [div2],
+    removed: [div]
+  });
 }
 
 function testAddAndRemoveOutsideTree() {
@@ -907,7 +979,9 @@ function testAddAndRemoveOutsideTree() {
   div1.appendChild(document.createElement('span'));
   div1.removeChild(div2);
   div2.removeChild(span);
-  assertSubtreeChanges([], [], [], [div1, div2, span]);
+  assertSummary({
+    removed: [div1, div2, span]
+  });
 
   // This add will be ignored because it happens outside the document tree.
   div1.appendChild(document.createElement('span'));
@@ -923,7 +997,9 @@ function testAddOutsideOfTreeAndReinsert() {
   // and 'add' because the parent node is later replaced.
   var span = div1.appendChild(document.createElement('span'));
   testDiv.appendChild(div1);
-  assertSubtreeChanges([span], [], [], []);
+  assertSummary({
+    added: [span]
+  });
 }
 
 function testMove() {
@@ -937,7 +1013,9 @@ function testMove() {
   div1.removeChild(div2);
   testDiv.appendChild(div2);
   testDiv.appendChild(div1);
-  assertSubtreeChanges([], [div2], [], []);
+  assertSummary({
+    reparented: [div2]
+  });
 }
 
 function testAddingToDetachedSubtree() {
@@ -947,7 +1025,9 @@ function testAddingToDetachedSubtree() {
   testDiv.removeChild(div1);
   var div2 = div1.appendChild(document.createElement('div'));
   var span = div2.appendChild(document.createElement('span'));
-  assertSubtreeChanges([], [], [], [div1]);
+  assertSummary({
+    removed: [div1]
+  });
 }
 
 function testReorderInsideTree() {
@@ -963,7 +1043,9 @@ function testReorderInsideTree() {
   testDiv.appendChild(div3);
   div3.appendChild(div2);
   div2.appendChild(div1);
-  assertSubtreeChanges([], [div1, div2, div3], [], []);
+  assertSummary({
+    reparented: [div1, div2, div3]
+  });
 }
 
 function testReorderInsideTreeAndAddMiddle() {
@@ -981,7 +1063,10 @@ function testReorderInsideTreeAndAddMiddle() {
   var div4 = document.createElement('div');
   div2.appendChild(div4);
   div4.appendChild(div1);
-  assertSubtreeChanges([div4], [div1, div2, div3], [], []);
+  assertSummary({
+    added: [div4],
+    reparented: [div1, div2, div3]
+  });
 }
 
 function testReorderOutsideTree() {
@@ -1011,7 +1096,9 @@ function testReorderAndRemoveFromTree() {
   div2.removeChild(div3);
   div3.appendChild(div2);
   div2.appendChild(div1);
-  assertSubtreeChanges([], [], [], [div1, div2, div3]);
+  assertSummary({
+    removed: [div1, div2, div3]
+  });
 }
 
 function testReorderAndRemoveSubtree() {
@@ -1024,7 +1111,10 @@ function testReorderAndRemoveSubtree() {
   testDiv.appendChild(div2);
   div2.appendChild(div1);
   div2.removeChild(div1);
-  assertSubtreeChanges([], [div2], [], [div1]);
+  assertSummary({
+    reparented: [div2],
+    removed: [div1]
+  });
 }
 
 function testReorderOutsideAndAddToTree() {
@@ -1039,7 +1129,9 @@ function testReorderOutsideAndAddToTree() {
   div3.appendChild(div2);
   div2.appendChild(div1);
   testDiv.appendChild(div3);
-  assertSubtreeChanges([div1, div2, div3], [], [], []);
+  assertSummary({
+    added: [div1, div2, div3]
+  });
 }
 
 function testReorderOutsideAndAddSubtree() {
@@ -1051,7 +1143,9 @@ function testReorderOutsideAndAddSubtree() {
   div1.removeChild(div2);
   div2.appendChild(div1);
   testDiv.appendChild(div2);
-  assertSubtreeChanges([div1, div2], [], [], []);
+  assertSummary({
+    added: [div1, div2]
+  });
 }
 
 function testRemoveSubtreeAndAddToExternal() {
@@ -1062,7 +1156,9 @@ function testRemoveSubtreeAndAddToExternal() {
   startObserving();
   testDiv.removeChild(div1);
   div3.appendChild(div1);
-  assertSubtreeChanges([], [], [], [div1, div2]);
+  assertSummary({
+    removed: [div1, div2]
+  });
 }
 
 function insertAfter(parent, node, refNode) {
@@ -1095,7 +1191,10 @@ function testMoveDetectNoop() {
   insertAfter(testDiv, divE, divG); // A [D  C  B  G  E] F
 
   // Final effect is A [D] C [B G] E F
-  assertSubtreeChanges([divG], [], [divD, divB], []);
+  assertSummary({
+    added: [divG],
+    reordered: [divD, divB]
+  });
 
   insertAfter(testDiv, divC, divA);
   insertAfter(testDiv, divD, divA);
@@ -1115,13 +1214,14 @@ function testMoveDetectNoopSimple() {
   insertAfter(testDiv, divA, divB); // [B A]
 
   // Final effect is B A
-
-  assertSubtreeChanges([], [], [divB], []);
+  assertSummary({
+    reordered: [divB]
+  });
 }
 
 function testIgnoreOwnChanges() {
   testCase.waitForAsync();
-
+  var div;
   var count = 0;
 
   var summary1 = new MutationSummary({

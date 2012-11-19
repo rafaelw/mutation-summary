@@ -13,7 +13,6 @@
 // limitations under the License.
 
 (function(global) {
-
   "use strict";
 
   var matchesSelector = 'matchesSelector';
