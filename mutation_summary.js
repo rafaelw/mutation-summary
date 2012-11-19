@@ -758,6 +758,9 @@
         parentNode = change.oldParentNode;
 
       change = this.childlistChanges.get(parentNode);
+      if (!change)
+        return false;
+
       if (change.moved)
         return change.moved.get(node);
 
