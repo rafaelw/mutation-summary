@@ -22,7 +22,9 @@
     matchesSelector = 'mozMatchesSelector';
 
   var MutationObserver = global.MutationObserver || global.WebKitMutationObserver || global.MozMutationObserver;
-  if (typeof MutationObserver != 'function') {
+  if (MutationObserver === undefined) {
+    console.log('MutationSummary cannot load: DOM Mutation Observers are required.');
+    console.log('https://developer.mozilla.org/en-US/docs/DOM/MutationObserver');
     return;
   }
 
