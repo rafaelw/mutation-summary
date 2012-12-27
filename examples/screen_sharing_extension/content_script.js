@@ -21,7 +21,7 @@ function socketSend(msg) {
 }
 
 window.addEventListener('load', function() {
-  chrome.extension.sendRequest({ mirror : true}, function(response) {
+  chrome.extension.sendMessage({ mirror : true}, function(response) {
     if (response.mirror)
       startMirroring();
     else
