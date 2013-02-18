@@ -13,7 +13,7 @@
 // limitations under the License.
 
 (function(global) {
-//  "use strict";
+  "use strict";
 
   var matchesSelector = 'matchesSelector';
   if ('webkitMatchesSelector' in Element.prototype)
