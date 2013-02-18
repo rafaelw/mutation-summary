@@ -1368,6 +1368,32 @@ function testIgnoreOwnChanges() {
   testDiv.appendChild(document.createElement('div'));
 }
 
+function testDisconnectDuringCallback() {
+  testCase.waitForAsync();
+  var div = document.createElement('div');
+
+  var callbackCount = 0;
+  var summary = new MutationSummary({
+    queries: [{ all: true }],
+    rootNode: div,
+    callback: function(summaries) {
+      callbackCount++;
+      if (callbackCount > 1)
+        return;
+
+      summary.disconnect();
+      setTimeout(function() {
+        div.setAttribute('bar', 'baz');
+        setTimeout(function() {
+          assertEquals(1, callbackCount);
+          continueTesting();
+        });
+      }, 0);
+    }
+  });
+
+  div.setAttribute('foo', 'bar');
+}
 </script>
 </body>
 </html>
