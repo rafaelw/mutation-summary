@@ -7,7 +7,7 @@ The purpose of this example is to demonstrate how to fully mirror the contents o
 
 --Installation--
 
-1. Copy ../../mutation_summary.js and ../../tree_mirror.js to this directory.
+1. Copy ../../src/mutation-summary.js and ../../util/tree-mirror.js to this directory.
 2. Navigate Chrome to chrome://extensions.
 3. Click the 'Developer Mode' checkbox.
 4. Click the 'Load unpacked extension...' button.

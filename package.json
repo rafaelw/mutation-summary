@@ -1,0 +1,30 @@
+{
+  "name": "mutation-summary",
+  "version": "0.0.0",
+  "description": "Makes observing the DOM fast and easy",
+  "main": "src/mutation-summary.js",
+  "directories": {
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://code.google.com/p/mutation-summary/"
+  },
+  "author": "",
+  "license": "Apache 2.0",
+  "devDependencies": {
+    "chai": "*",
+    "mocha": "*"
+  }
+}
+
+
+
+
+
+
+

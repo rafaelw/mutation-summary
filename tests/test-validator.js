@@ -1,4 +1,4 @@
-// Copyright 2011 Google Inc.
+// Copyright 2013 Google Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,19 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-function compareNodeArrayIgnoreOrder(expected, actual) {
-  assertEquals(expected.length, actual.length);
-
-  var map = new MutationSummary.NodeMap;
-  expected.forEach(function(node) {
-    map.set(node, true);
-  });
-
-  actual.forEach(function(node) {
-    assertTrue(map.has(node));
-  });
-}
 
 MutationSummary.createQueryValidator = function(root, query) {
   var matchesSelector = 'matchesSelector';
@@ -50,7 +37,7 @@ MutationSummary.createQueryValidator = function(root, query) {
     function allValidator(summary, stayed, old, current) {
       summary.reordered.forEach(function(node) {
         var oldPreviousSiblingMap = old.get(summary.getOldParentNode(node));
-        assertEquals(oldPreviousSiblingMap.get(node), summary.getOldPreviousSibling(node));
+        assert.strictEqual(oldPreviousSiblingMap.get(node), summary.getOldPreviousSibling(node));
       });
     }
 
@@ -74,7 +61,7 @@ MutationSummary.createQueryValidator = function(root, query) {
       compareNodeArrayIgnoreOrder(changed, summary.valueChanged);
 
       changed.forEach(function(node) {
-        assertEquals(old.get(node), summary.getOldCharacterData(node));
+        assert.strictEqual(old.get(node), summary.getOldCharacterData(node));
       });
     }
 
@@ -98,7 +85,7 @@ MutationSummary.createQueryValidator = function(root, query) {
       compareNodeArrayIgnoreOrder(changed, summary.valueChanged);
 
       changed.forEach(function(node) {
-        assertEquals(old.get(node), summary.getOldAttribute(node));
+        assert.strictEqual(old.get(node), summary.getOldAttribute(node, query.attribute));
       });
     }
 
@@ -168,12 +155,12 @@ MutationSummary.createQueryValidator = function(root, query) {
                                     summary.attributeChanged[attrName]);
 
         attributeChanged[attrName].forEach(function(node) {
-          assertEquals(old.get(node).attributes[attrName], summary.getOldAttribute(node, attrName));
+          node(old.get(node).attributes[attrName], summary.getOldAttribute(node, attrName));
         });
       });
 
       function checkOldParentNode(node) {
-        assertEquals(old.get(node).parentNode, summary.getOldParentNode(node));
+        assert.strictEqual(old.get(node).parentNode, summary.getOldParentNode(node));
       }
 
       summary.removed.forEach(checkOldParentNode);
