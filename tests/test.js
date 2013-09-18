@@ -66,6 +66,7 @@ suite('Mutation Summary', function () {
         expect.reordered = expect.reordered || [];
         expect.attributeChanged = expect.attributeChanged || {};
 
+        // added, removed
         assert(typeof expect.added == typeof changed.added && typeof expect.removed == typeof changed.removed);
         compareNodeArrayIgnoreOrder(expect.added, changed.added);
         compareNodeArrayIgnoreOrder(expect.removed, changed.removed);
@@ -147,6 +148,7 @@ suite('Mutation Summary', function () {
         div.setAttribute('bar', '3');
         observer.reconnect();
 
+        // summaries returned from disconnect are handed in.
         assertSummary({
             attributeChanged: { 'foo': [div], 'bar': [] },
             attributeOldValue: { 'foo': ['1'], 'bar': [] }
@@ -154,6 +156,7 @@ suite('Mutation Summary', function () {
 
         div.setAttribute('foo', '3');
 
+        // change to 'bar' should never be reported.
         assertSummary({
             attributeChanged: { 'foo': [div], 'bar': [] },
             attributeOldValue: { 'foo': ['2'], 'bar': [] }
@@ -276,6 +279,7 @@ suite('Mutation Summary', function () {
         text.textContent = 'bar';
         text.textContent = 'bat';
 
+        // we won't hear about the change.
         assertNothingReported();
     });
 
@@ -442,6 +446,7 @@ suite('Mutation Summary', function () {
 
         div3.setAttribute('BaZ', 'bat');
 
+        // Note: SVG Elements aren't HTMLElements, so el.id doesn't delegate to the 'id' attribute.
         upperSpan.setAttribute('id', 'foo');
         upperSpan.setAttribute('Blow', 'blarg bloog');
         assertSummary({
@@ -609,6 +614,7 @@ suite('Mutation Summary', function () {
         startObserving();
         testDiv.removeChild(div1);
 
+        // This add will be ignored since this is a detached subtree.
         div1.appendChild(document.createElement('span'));
         div1.removeChild(div2);
         div2.removeChild(span);
@@ -616,6 +622,7 @@ suite('Mutation Summary', function () {
             removed: [div1, div2, span]
         });
 
+        // This add will be ignored because it happens outside the document tree.
         div1.appendChild(document.createElement('span'));
         assertNothingReported();
     });
@@ -626,6 +633,8 @@ suite('Mutation Summary', function () {
         startObserving();
         testDiv.removeChild(div1);
 
+        // This add is taking place while outside the tree, but should be considered
+        // and 'add' because the parent node is later replaced.
         var span = div1.appendChild(document.createElement('span'));
         testDiv.appendChild(div1);
         assertSummary({
@@ -835,6 +844,7 @@ suite('Mutation Summary', function () {
         insertAfter(testDiv, divC, null);
         insertAfter(testDiv, divD, null);
 
+        // Final effect is [D  C  B] A
         assertSummary({
             reordered: [divD, divC, divB],
             reorderedOldPreviousSibling: [divC, divB, divA]
@@ -857,6 +867,7 @@ suite('Mutation Summary', function () {
         insertAfter(testDiv, divA, divC);
         insertAfter(testDiv, divB, divA);
 
+        // Final effect is C [A B]
         assertSummary({
             reordered: [divA, divB],
             reorderedOldPreviousSibling: [null, divA]
@@ -894,6 +905,7 @@ suite('Mutation Summary', function () {
         insertAfter(testDiv, divG, divE);
         insertAfter(testDiv, divE, divG);
 
+        // Final effect is A D [C B G] E F
         assertSummary({
             added: [divG],
             reordered: [divB, divC],
@@ -919,6 +931,7 @@ suite('Mutation Summary', function () {
         insertAfter(testDiv, divB, divA);
         insertAfter(testDiv, divA, divB);
 
+        // Final effect is B [A]
         assertSummary({
             reordered: [divA],
             reorderedOldPreviousSibling: [null]
@@ -1022,10 +1035,12 @@ suite('TreeMirror Fuzzer', function () {
         var allNodes = [];
         var nonRootNodes = [];
 
+        // Generate random document.
         randomTree(testDiv, TREE_SIZE);
         getReachable(testDiv, allNodes);
         getReachable(testDiv, nonRootNodes, true);
 
+        // Generate some fragments which lie outside the document.
         var nonDocCount = randInt(1, NON_DOC_ROOTS_MAX);
         for (var i = 0; i < nonDocCount; i++) {
             var nonDoc = randomNode();
@@ -1104,6 +1119,9 @@ suite('TreeMirror Fuzzer', function () {
         }
     }
 
+    // This is used because our implementation of Map is just a shim. If keys
+    // in our map have a magical __id__ property, then access becomes constant
+    // rather than linear.
     var nodePrivateIdCounter = 2;
 
     function randomTree(root, numNodes) {
@@ -1183,7 +1201,8 @@ suite('TreeMirror Fuzzer', function () {
         if (maybeText && !randInt(0, 8)) {
             var text = randomText();
             if (randInt(0, 1))
-                node = document.createTextNode(text); else
+                node = document.createTextNode(text);
+else
                 node = document.createComment(text);
         } else {
             node = document.createElement(randomTagname());
@@ -1229,6 +1248,8 @@ suite('TreeMirror Fuzzer', function () {
         function moveNode(allNodes, node) {
             var parent = selectNodeAtRandom(allNodes, node, true);
 
+            // NOTE: The random index here maybe be childNodes[childNodes.length]
+            // which is undefined, meaning 'insert at end of childlist'.
             var beforeNode = parent.childNodes[randInt(0, parent.childNodes.length)];
 
             parent.insertBefore(node, beforeNode);
@@ -1237,7 +1258,8 @@ suite('TreeMirror Fuzzer', function () {
         function mutateAttribute(node) {
             var attrName = randomAttributeName();
             if (randInt(0, 1))
-                node.setAttribute(attrName, randInt(0, 9)); else
+                node.setAttribute(attrName, randInt(0, 9));
+else
                 node.removeAttribute(attrName);
         }
 
@@ -1253,8 +1275,9 @@ suite('TreeMirror Fuzzer', function () {
         }
 
         if (node.nodeType == Node.TEXT_NODE)
-            mutateText(node); else if (node.nodeType == Node.ELEMENT_NODE)
+            mutateText(node);
+else if (node.nodeType == Node.ELEMENT_NODE)
             mutateAttribute(node);
     }
 });
-//@ sourceMappingURL=test.js.map
+//# sourceMappingURL=test.js.map

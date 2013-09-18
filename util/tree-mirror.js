@@ -1,3 +1,4 @@
+///<reference path='../src/mutation-summary.ts'/>
 var TreeMirror = (function () {
     function TreeMirror(root, delegate) {
         this.root = root;
@@ -13,6 +14,10 @@ var TreeMirror = (function () {
 
     TreeMirror.prototype.applyChanged = function (removed, addedOrMoved, attributes, text) {
         var _this = this;
+        // NOTE: Applying the changes can result in an attempting to add a child
+        // to a parent which is presently an ancestor of the parent. This can occur
+        // based on random ordering of moves. The way we handle this is to first
+        // remove all changed nodes from their parents, then apply.
         addedOrMoved.forEach(function (data) {
             var node = _this.deserializeNode(data);
             var parent = _this.deserializeNode(data.parentNode);
@@ -196,7 +201,7 @@ var TreeMirrorClient = (function () {
                 data.tagName = elm.tagName;
                 data.attributes = {};
                 for (var i = 0; i < elm.attributes.length; i++) {
-                    var attr = elm.attributes.item(i);
+                    var attr = elm.attributes[i];
                     data.attributes[attr.name] = attr.value;
                 }
 
@@ -213,6 +218,7 @@ var TreeMirrorClient = (function () {
     };
 
     TreeMirrorClient.prototype.serializeAddedAndMoved = function (added, reparented, reordered) {
+        var _this = this;
         var all = added.concat(reparented).concat(reordered);
 
         var parentMap = new MutationSummary.NodeMap();
@@ -240,9 +246,9 @@ var TreeMirrorClient = (function () {
                     node = node.previousSibling;
 
                 while (node && children.has(node)) {
-                    var data = this.serializeNode(node);
-                    data.previousSibling = this.serializeNode(node.previousSibling);
-                    data.parentNode = this.serializeNode(node.parentNode);
+                    var data = _this.serializeNode(node);
+                    data.previousSibling = _this.serializeNode(node.previousSibling);
+                    data.parentNode = _this.serializeNode(node.parentNode);
                     moved.push(data);
                     children.delete(node);
                     node = node.nextSibling;
@@ -250,7 +256,7 @@ var TreeMirrorClient = (function () {
 
                 var keys = children.keys();
             }
-        }, this);
+        });
 
         return moved;
     };
@@ -303,4 +309,4 @@ var TreeMirrorClient = (function () {
     };
     return TreeMirrorClient;
 })();
-//@ sourceMappingURL=tree-mirror.js.map
+//# sourceMappingURL=tree-mirror.js.map

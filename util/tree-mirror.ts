@@ -253,7 +253,7 @@ class TreeMirrorClient {
         data.tagName = elm.tagName;
         data.attributes = {};
         for (var i = 0; i < elm.attributes.length; i++) {
-          var attr = elm.attributes.item(i);
+          var attr = elm.attributes[i];
           data.attributes[attr.name] = attr.value;
         }
 
@@ -276,7 +276,7 @@ class TreeMirrorClient {
 
     var parentMap = new MutationSummary.NodeMap<NodeMap<boolean>>();
 
-    all.forEach(function(node) {
+    all.forEach((node) => {
       var parent = node.parentNode;
       var children = parentMap.get(parent)
       if (!children) {
@@ -289,7 +289,7 @@ class TreeMirrorClient {
 
     var moved:PositionData[] = [];
 
-    parentMap.keys().forEach(function(parent) {
+    parentMap.keys().forEach((parent) => {
       var children = parentMap.get(parent);
 
       var keys = children.keys();
@@ -299,7 +299,7 @@ class TreeMirrorClient {
           node = node.previousSibling;
 
         while (node && children.has(node)) {
-          var data = this.serializeNode(node);
+          var data = <PositionData>this.serializeNode(node);
           data.previousSibling = this.serializeNode(node.previousSibling);
           data.parentNode = this.serializeNode(node.parentNode);
           moved.push(<PositionData>data);
@@ -309,7 +309,7 @@ class TreeMirrorClient {
 
         var keys = children.keys();
       }
-    }, this);
+    });
 
     return moved;
   }

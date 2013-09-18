@@ -55,6 +55,15 @@ var NodeMap = (function () {
     return NodeMap;
 })();
 
+/**
+*  var reachableMatchableProduct = [
+*  //  STAYED_OUT,  ENTERED,     STAYED_IN,   EXITED
+*    [ STAYED_OUT,  STAYED_OUT,  STAYED_OUT,  STAYED_OUT ], // STAYED_OUT
+*    [ STAYED_OUT,  ENTERED,     ENTERED,     STAYED_OUT ], // ENTERED
+*    [ STAYED_OUT,  ENTERED,     STAYED_IN,   EXITED     ], // STAYED_IN
+*    [ STAYED_OUT,  STAYED_OUT,  EXITED,      EXITED     ]  // EXITED
+*  ];
+*/
 var Movement;
 (function (Movement) {
     Movement[Movement["STAYED_OUT"] = 0] = "STAYED_OUT";
@@ -62,7 +71,6 @@ var Movement;
     Movement[Movement["STAYED_IN"] = 2] = "STAYED_IN";
     Movement[Movement["REPARENTED"] = 3] = "REPARENTED";
     Movement[Movement["REORDERED"] = 4] = "REORDERED";
-
     Movement[Movement["EXITED"] = 5] = "EXITED";
 })(Movement || (Movement = {}));
 
@@ -124,18 +132,28 @@ var NodeChange = (function () {
         this.characterDataOldValue = oldValue;
     };
 
+    // Note: is it possible to receive a removal followed by a removal. This
+    // can occur if the removed node is added to an non-observed node, that
+    // node is added to the observed area, and then the node removed from
+    // it.
     NodeChange.prototype.removedFromParent = function (parent) {
         this.childList = true;
         if (this.added || this.oldParentNode)
-            this.added = false; else
+            this.added = false;
+else
             this.oldParentNode = parent;
     };
 
-    NodeChange.prototype.insertedIntoParent = function (parent) {
+    NodeChange.prototype.insertedIntoParent = function () {
         this.childList = true;
         this.added = true;
     };
 
+    // An node's oldParent is
+    //   -its present parent, if its parentNode was not changed.
+    //   -null if the first thing that happened to it was an add.
+    //   -the node it was removed from if the first thing that happened to it
+    //      was a remove.
     NodeChange.prototype.getOldParent = function () {
         if (this.childList) {
             if (this.oldParentNode)
@@ -183,7 +201,7 @@ var TreeChanges = (function (_super) {
                     }
                     for (var i = 0; i < mutation.addedNodes.length; i++) {
                         var node = mutation.addedNodes[i];
-                        this.getChange(node).insertedIntoParent(mutation.target);
+                        this.getChange(node).insertedIntoParent();
                     }
                     break;
 
@@ -230,6 +248,7 @@ var TreeChanges = (function (_super) {
         return isReachable;
     };
 
+    // A node wasReachable if its oldParent wasReachable.
     TreeChanges.prototype.getWasReachable = function (node) {
         if (node === this.rootNode)
             return true;
@@ -256,6 +275,7 @@ var TreeChanges = (function (_super) {
 })(NodeMap);
 
 var MutationProjection = (function () {
+    // TOOD(any)
     function MutationProjection(rootNode, mutations, selectors, calcReordered, calcOldPreviousSibling) {
         this.rootNode = rootNode;
         this.mutations = mutations;
@@ -298,6 +318,7 @@ var MutationProjection = (function () {
         if (reachable === Movement.STAYED_OUT)
             return;
 
+        // Cache match results for sub-patterns.
         this.matchabilityChange(node);
 
         if (reachable === Movement.ENTERED) {
@@ -373,7 +394,8 @@ var MutationProjection = (function () {
             } else if (matchable === Movement.STAYED_IN && (summary.reparented || summary.reordered)) {
                 var movement = this.stayedIn.get(node);
                 if (summary.reparented && movement === Movement.REPARENTED)
-                    summary.reparented.push(node); else if (summary.reordered && movement === Movement.REORDERED)
+                    summary.reparented.push(node);
+else if (summary.reordered && movement === Movement.REORDERED)
                     summary.reordered.push(node);
             }
         }
@@ -555,12 +577,14 @@ var MutationProjection = (function () {
                     break;
                 case Movement.ENTERED:
                     if (accum === Movement.EXITED)
-                        accum = Movement.STAYED_IN; else
+                        accum = Movement.STAYED_IN;
+else
                         accum = Movement.ENTERED;
                     break;
                 case Movement.EXITED:
                     if (accum === Movement.ENTERED)
-                        accum = Movement.STAYED_IN; else
+                        accum = Movement.STAYED_IN;
+else
                         accum = Movement.EXITED;
                     break;
             }
@@ -754,7 +778,8 @@ var Summary = (function () {
             var characterDataChanged = projection.getCharacterDataChanged();
 
             if (query.characterData)
-                this.valueChanged = characterDataChanged; else
+                this.valueChanged = characterDataChanged;
+else
                 this.characterDataChanged = characterDataChanged;
         }
 
@@ -779,9 +804,13 @@ var Summary = (function () {
     return Summary;
 })();
 
+// TODO(rafaelw): Allow ':' and '.' as valid name characters.
 var validNameInitialChar = /[a-zA-Z_]+/;
 var validNameNonInitialChar = /[a-zA-Z0-9_\-]+/;
 
+// TODO(rafaelw): Consider allowing backslash in the attrValue.
+// TODO(rafaelw): There's got a to be way to represent this state machine
+// more compactly???
 function escapeQuotes(value) {
     return '"' + value.replace(/"/, '\\\"') + '"';
 }
@@ -886,7 +915,8 @@ var Selector = (function () {
     Selector.prototype.matchabilityChange = function (el, change) {
         var isMatching = this.isMatching(el);
         if (isMatching)
-            return this.wasMatching(el, change, isMatching) ? Movement.STAYED_IN : Movement.ENTERED; else
+            return this.wasMatching(el, change, isMatching) ? Movement.STAYED_IN : Movement.ENTERED;
+else
             return this.wasMatching(el, change, isMatching) ? Movement.EXITED : Movement.STAYED_OUT;
     };
 
@@ -1243,6 +1273,7 @@ var Selector = (function () {
             case QUALIFIER:
             case QUALIFIER_NAME:
             case SELECTOR_SEPARATOR:
+                // Valid end states.
                 newSelector();
                 break;
             default:
@@ -1311,15 +1342,12 @@ function validateElementAttributes(attribs) {
     return Object.keys(attributes);
 }
 
-function elementFilterAttributes(filters) {
+function elementFilterAttributes(selectors) {
     var attributes = {};
 
-    filters.forEach(function (filter) {
-        filter.qualifiers.forEach(function (qualifier) {
-            if (qualifier.class)
-                attributes['class'] = true; else if (qualifier.id)
-                attributes['id'] = true; else
-                attributes[qualifier.attrName] = true;
+    selectors.forEach(function (selector) {
+        selector.qualifiers.forEach(function (qualifier) {
+            attributes[qualifier.attrName] = true;
         });
     });
 
@@ -1373,10 +1401,12 @@ var MutationSummary = (function () {
             observerOptions.attributeOldValue = true;
 
             if (!attributes) {
+                // observe all.
                 attributeFilter = undefined;
                 return;
             }
 
+            // add to observed.
             attributeFilter = attributeFilter || {};
             attributes.forEach(function (attribute) {
                 attributeFilter[attribute] = true;
@@ -1384,31 +1414,26 @@ var MutationSummary = (function () {
             });
         }
 
-        queries.forEach(function (request) {
-            if (request.characterData) {
+        queries.forEach(function (query) {
+            if (query.characterData) {
                 observerOptions.characterData = true;
                 observerOptions.characterDataOldValue = true;
                 return;
             }
 
-            if (request.all) {
+            if (query.all) {
                 observeAttributes();
                 observerOptions.characterData = true;
                 observerOptions.characterDataOldValue = true;
                 return;
             }
 
-            if (request.attribute) {
-                observeAttributes([request.attribute.trim()]);
+            if (query.attribute) {
+                observeAttributes([query.attribute.trim()]);
                 return;
             }
 
-            if (request.elementFilter && request.elementFilter.some(function (f) {
-                return f.className;
-            }))
-                observeAttributes(['class']);
-
-            var attributes = elementFilterAttributes(request.elementFilter).concat(request.attributeList || []);
+            var attributes = elementFilterAttributes(query.elementFilter).concat(query.attributeList || []);
             if (attributes.length)
                 observeAttributes(attributes);
         });
@@ -1606,4 +1631,4 @@ var MutationSummary = (function () {
     };
     return MutationSummary;
 })();
-//@ sourceMappingURL=mutation-summary.js.map
+//# sourceMappingURL=mutation-summary.js.map

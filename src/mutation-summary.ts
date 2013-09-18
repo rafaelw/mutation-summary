@@ -1,5 +1,3 @@
-///<reference path='mutation-observer.d.ts'/>
-
 // Copyright 2011 Google Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -168,7 +166,7 @@ class NodeChange {
       this.oldParentNode = parent;
   }
 
-  insertedIntoParent(parent:Node) {
+  insertedIntoParent() {
     this.childList = true;
     this.added = true;
   }
@@ -240,7 +238,7 @@ class TreeChanges extends NodeMap<NodeChange> {
           }
           for (var i = 0; i < mutation.addedNodes.length; i++) {
             var node = mutation.addedNodes[i];
-            this.getChange(node).insertedIntoParent(mutation.target);
+            this.getChange(node).insertedIntoParent();
           }
           break;
 
@@ -1422,17 +1420,12 @@ function validateElementAttributes(attribs:string):string[] {
 
 
 
-function elementFilterAttributes(filters) {
-  var attributes = {};
+function elementFilterAttributes(selectors:Selector[]):string[] {
+  var attributes:StringMap<boolean> = {};
 
-  filters.forEach((filter) => {
-    filter.qualifiers.forEach((qualifier) => {
-      if (qualifier.class)
-        attributes['class'] = true;
-      else if (qualifier.id)
-        attributes['id'] = true;
-      else
-        attributes[qualifier.attrName] = true;
+  selectors.forEach((selector) => {
+    selector.qualifiers.forEach((qualifier) => {
+      attributes[qualifier.attrName] = true;
     });
   });
 
@@ -1509,29 +1502,26 @@ class MutationSummary {
       });
     }
 
-    queries.forEach((request) => {
-      if (request.characterData) {
+    queries.forEach((query) => {
+      if (query.characterData) {
         observerOptions.characterData = true;
         observerOptions.characterDataOldValue = true;
         return;
       }
 
-      if (request.all) {
+      if (query.all) {
         observeAttributes();
         observerOptions.characterData = true;
         observerOptions.characterDataOldValue = true;
         return;
       }
 
-      if (request.attribute) {
-        observeAttributes([request.attribute.trim()]);
+      if (query.attribute) {
+        observeAttributes([query.attribute.trim()]);
         return;
       }
 
-      if (request.elementFilter && request.elementFilter.some((f) => { return f.className; } ))
-        observeAttributes(['class']);
-
-      var attributes = elementFilterAttributes(request.elementFilter).concat(request.attributeList || []);
+      var attributes = elementFilterAttributes(query.elementFilter).concat(query.attributeList || []);
       if (attributes.length)
         observeAttributes(attributes);
     });
@@ -1592,7 +1582,7 @@ class MutationSummary {
       // element
       if ('element' in request) {
         var requestOptionCount = Object.keys(request).length;
-        var query = {
+        var query:Query = {
           element: request.element,
           elementFilter: Selector.parseSelectors(request.element)
         };
