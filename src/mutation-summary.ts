@@ -12,7 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-if (MutationObserver === undefined) {
+var MutationObserverCtor;
+if (typeof WebKitMutationObserver !== 'undefined')
+  MutationObserverCtor = WebKitMutationObserver;
+else
+  MutationObserverCtor = MutationObserver;
+
+if (MutationObserverCtor === undefined) {
   console.error('DOM Mutation Observers are required.');
   console.error('https://developer.mozilla.org/en-US/docs/DOM/MutationObserver');
   throw Error('DOM Mutation Observers are required');
@@ -1685,7 +1691,7 @@ class MutationSummary {
       });
     }
 
-    this.observer = new MutationObserver((mutations:MutationRecord[]) => {
+    this.observer = new MutationObserverCtor((mutations:MutationRecord[]) => {
       this.observerCallback(mutations);
     });
 
