@@ -34,6 +34,10 @@ var NodeMap = (function () {
         this.nodes = [];
         this.values = [];
     }
+    NodeMap.prototype.isIndex = function (s) {
+        return +s === s >>> 0;
+    };
+
     NodeMap.prototype.nodeId = function (node) {
         var id = node[NodeMap.ID_PROP];
         if (!id)
@@ -64,8 +68,11 @@ var NodeMap = (function () {
 
     NodeMap.prototype.keys = function () {
         var nodes = [];
-        for (var id in this.nodes)
+        for (var id in this.nodes) {
+            if (!this.isIndex(id))
+                continue;
             nodes.push(this.nodes[id]);
+        }
 
         return nodes;
     };

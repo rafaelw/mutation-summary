@@ -217,6 +217,50 @@ suite('Mutation Summary', function() {
     div2.setAttribute('foo', 'baz2');
     assertNothingReported();
   });
+  
+  test('Attribute -- Array proto changed', function() {
+    Array.prototype.foo = 'bar';
+    
+    var div = document.createElement('div');
+    testDiv.appendChild(div);
+    div.setAttribute('foo', 'bar');
+
+    var div2 = document.createElement('div');
+    testDiv.appendChild(div2);
+
+    var div3 = document.createElement('div');
+    div3.setAttribute('foo', 'bat');
+
+    startObserving({
+      attribute: "foo"
+    });
+
+    div.setAttribute('foo', 'bar2');
+    div2.setAttribute('foo', 'baz');
+    testDiv.appendChild(div3);
+    div3.setAttribute('foo', 'bat2');
+    assertSummary({
+      added: [div2, div3],
+      valueChanged: [div],
+      oldValues: ['bar']
+    });
+
+    div3.setAttribute('foo', 'bat3');
+    testDiv.removeChild(div3);
+    testDiv.removeChild(div);
+    div2.setAttribute('foo', 'baz2');
+    assertSummary({
+      added: [],
+      removed: [div3, div],
+      valueChanged: [div2],
+      oldValues: ['baz']
+    });
+
+    div2.removeAttribute('foo');
+    div2.setAttribute('foo', 'baz2');
+    assertNothingReported();
+    delete Array.prototype.foo;
+  });
 
   test('Attribute Case Insensitive', function() {
     var div = document.createElement('div');

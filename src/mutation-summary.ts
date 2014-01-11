@@ -45,6 +45,10 @@ class NodeMap<T> {
     this.values = [];
   }
 
+  private isIndex(s:string):boolean {
+    return +s === s >>> 0;
+  }
+
   private nodeId(node:Node) {
     var id = node[NodeMap.ID_PROP];
     if (!id)
@@ -75,9 +79,12 @@ class NodeMap<T> {
 
   keys():Node[] {
     var nodes:Node[] = [];
-    for (var id in this.nodes)
+    for (var id in this.nodes) {
+      if (!this.isIndex(id))
+        continue;
       nodes.push(this.nodes[id]);
-
+    }
+    
     return nodes;
   }
 }
