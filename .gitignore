@@ -2,3 +2,4 @@
 .idea
 *.js.map
 node_modules
+.project

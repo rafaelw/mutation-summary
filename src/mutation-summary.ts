@@ -105,8 +105,6 @@ function enteredOrExited(changeType:Movement):boolean {
   return changeType === Movement.ENTERED || changeType === Movement.EXITED;
 }
 
-declare var HTMLDocument;
-
 class NodeChange {
 
   public isCaseInsensitive:boolean;
@@ -134,7 +132,7 @@ class NodeChange {
   }
 
   getAttributeNamesMutated():string[] {
-    var names = [];
+    var names:string[] = [];
     if (!this.attributeOldValues)
       return names;
     for (var name in this.attributeOldValues) {
@@ -494,7 +492,7 @@ class MutationProjection {
     return change.oldPrevious.get(node);
   }
 
-  getOldAttribute(element, attrName) {
+  getOldAttribute(element:Node, attrName:string):string {
     var change = this.treeChanges.get(element);
     if (!change || !change.attributes)
       throw Error('getOldAttribute requested on invalid node.');
@@ -506,7 +504,7 @@ class MutationProjection {
     return value;
   }
 
-  attributeChangedNodes(includeAttributes:string[]):StringMap<Node[]> {
+  attributeChangedNodes(includeAttributes:string[]):StringMap<Element[]> {
     if (!this.treeChanges.anyAttributesChanged)
       return {}; // No attributes mutations occurred.
 
@@ -522,7 +520,7 @@ class MutationProjection {
       }
     }
 
-    var result:StringMap<Node[]> = {};
+    var result:StringMap<Element[]> = {};
     var nodes = this.treeChanges.keys();
 
     for (var i = 0; i < nodes.length; i++) {
@@ -563,7 +561,7 @@ class MutationProjection {
     return result;
   }
 
-  getOldCharacterData(node) {
+  getOldCharacterData(node:Node):string {
     var change = this.treeChanges.get(node);
     if (!change || !change.characterData)
       throw Error('getOldCharacterData requested on invalid node.');
@@ -571,12 +569,12 @@ class MutationProjection {
     return change.characterDataOldValue;
   }
 
-  getCharacterDataChanged() {
+  getCharacterDataChanged():Node[] {
     if (!this.treeChanges.anyCharacterDataChanged)
       return []; // No characterData mutations occurred.
 
     var nodes = this.treeChanges.keys();
-    var result = [];
+    var result:Node[] = [];
     for (var i = 0; i < nodes.length; i++) {
       var target = nodes[i];
       if (Movement.STAYED_IN !== this.treeChanges.reachabilityChange(target))
@@ -692,7 +690,7 @@ class MutationProjection {
 
       var oldPrevious = mutation.previousSibling;
 
-      function recordOldPrevious(node, previous) {
+      function recordOldPrevious(node:Node, previous:Node) {
         if (!node ||
             change.oldPrevious.has(node) ||
             change.added.has(node) ||
@@ -735,7 +733,7 @@ class MutationProjection {
     }
   }
 
-  wasReordered(node) {
+  wasReordered(node:Node) {
     if (!this.treeChanges.anyParentsChanged)
       return false;
 
@@ -756,7 +754,7 @@ class MutationProjection {
     change.moved = new NodeMap<boolean>();
     var pendingMoveDecision = new NodeMap<boolean>();
 
-    function isMoved(node) {
+    function isMoved(node:Node) {
       if (!node)
         return false;
       if (!change.maybeMoved.has(node))
@@ -829,7 +827,7 @@ class Summary {
   public attributeChanged:StringMap<Element[]>;
   public characterDataChanged:Node[];
 
-  constructor(private projection, query:Query) {
+  constructor(private projection:MutationProjection, query:Query) {
     this.added = [];
     this.removed = [];
     this.reparented = query.all || query.element ? [] : undefined;
@@ -1039,7 +1037,7 @@ class Selector {
     }
 
     var WHITESPACE = /\s/;
-    var valueQuoteChar;
+    var valueQuoteChar:string;
     var SYNTAX_ERROR = 'Invalid or unsupported selector syntax.';
 
     var SELECTOR = 1;
@@ -1486,7 +1484,7 @@ class MutationSummary {
       subtree: true
     };
 
-    var attributeFilter;
+    var attributeFilter:StringMap<boolean>;
     function observeAttributes(attributes?:string[]) {
       if (observerOptions.attributes && !attributeFilter)
         return; // already observing all.

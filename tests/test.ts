@@ -2,12 +2,12 @@
 ///<reference path='../src/mutation-summary.ts'/>
 ///<reference path='../util/tree-mirror.ts'/>
 
-declare var suite:(string, any)=>any;
-declare var test:(string, any)=>any;
-declare var setup:(any)=>any;
-declare var teardown:(any)=>any;
+declare var suite:(s:string, a:any)=>any;
+declare var test:(s:string, a:any)=>any;
+declare var setup:(a:any)=>any;
+declare var teardown:(a:any)=>any;
 
-function compareNodeArrayIgnoreOrder(expected, actual) {
+function compareNodeArrayIgnoreOrder(expected:Node[], actual:Node[]) {
   assert.strictEqual(expected.length, actual.length);
 
   var map = new MutationSummary.NodeMap<boolean>();
@@ -25,9 +25,9 @@ suite('Mutation Summary', function() {
   var testDiv:Element;
   var observer:MutationSummary;
   var observing:boolean;
-  var changed;
-  var query;
-  var options;
+  var changed:Node[];
+  var query:Query;
+  var options:Options;
 
   setup(function() {
     testDiv = document.getElementById('test-div');
@@ -82,7 +82,7 @@ suite('Mutation Summary', function() {
     compareNodeArrayIgnoreOrder(expect.removed, changed.removed);
 
     if (options.oldPreviousSibling) {
-      expect.removed.forEach(function(node, index) {
+      expect.removed.forEach(function(node:Node, index:number) {
         assert.strictEqual(expect.removedOldPreviousSibling[index], changed.getOldPreviousSibling(node));
       });
     }
@@ -93,7 +93,7 @@ suite('Mutation Summary', function() {
       compareNodeArrayIgnoreOrder(expect.reparented, changed.reparented);
 
       if (options.oldPreviousSibling) {
-        expect.reparented.forEach(function(node, index) {
+        expect.reparented.forEach(function(node:Node, index:number) {
           assert.strictEqual(expect.reparentedOldPreviousSibling[index], changed.getOldPreviousSibling(node));
         });
       }
@@ -106,7 +106,7 @@ suite('Mutation Summary', function() {
       assert(typeof expect.reordered == typeof changed.reordered);
       compareNodeArrayIgnoreOrder(expect.reordered, changed.reordered);
 
-      expect.reordered.forEach(function(node, index) {
+      expect.reordered.forEach(function(node:Node, index:number) {
         assert.strictEqual(expect.reorderedOldPreviousSibling[index], changed.getOldPreviousSibling(node));
       });
     } else {
@@ -119,7 +119,7 @@ suite('Mutation Summary', function() {
       compareNodeArrayIgnoreOrder(expect.valueChanged, changed.valueChanged);
       var getOldFunction = query.attribute ? 'getOldAttribute' : 'getOldCharacterData';
 
-      expect.valueChanged.forEach(function(node, index) {
+      expect.valueChanged.forEach(function(node:Node, index:number) {
         assert.strictEqual(expect.oldValues[index], changed[getOldFunction](node, query.attribute));
       });
     } else {
@@ -133,7 +133,7 @@ suite('Mutation Summary', function() {
 
       Object.keys(expect.attributeChanged).forEach(function(attrName) {
         compareNodeArrayIgnoreOrder(expect.attributeChanged[attrName], changed.attributeChanged[attrName]);
-        expect.attributeOldValue[attrName].forEach(function(attrOldValue, index) {
+        expect.attributeOldValue[attrName].forEach(function(attrOldValue:string, index:number) {
           assert.strictEqual(expect.attributeOldValue[attrName][index], changed.getOldAttribute(expect.attributeChanged[attrName][index], attrName));
         });
       });
@@ -949,8 +949,8 @@ suite('Mutation Summary', function() {
     });
   });
 
-  test('Ignore Own Changes', function(async) {
-    var div;
+  test('Ignore Own Changes', function(async:()=>any) {
+    var div:Node;
     var count = 0;
 
     var summary1 = new MutationSummary({
@@ -1001,7 +1001,7 @@ suite('Mutation Summary', function() {
   });
 
 
-  test('Disconnect During Callback', function(async) {
+  test('Disconnect During Callback', function(async:()=>any) {
     var div = document.createElement('div');
 
     var callbackCount = 0;
@@ -1031,14 +1031,14 @@ suite('Mutation Summary', function() {
 
 suite('TreeMirror Fuzzer', function() {
 
-  var testDiv;
+  var testDiv:Element;
 
   setup(function() {
     testDiv = document.createElement('div');
     testDiv.id = 'test-div';
   });
 
-  test('Fuzzer', function(async) {
+  test('Fuzzer', function(async:()=>any) {
     this.timeout(15000);
 
     var TREE_SIZE = 512;
@@ -1047,8 +1047,8 @@ suite('TreeMirror Fuzzer', function() {
     var NON_DOC_ROOTS_MAX = 4;
 
 
-    var allNodes = []
-    var nonRootNodes = [];
+    var allNodes:Node[] = []
+    var nonRootNodes:Node[] = [];
 
     // Generate random document.
     randomTree(testDiv, TREE_SIZE);
@@ -1110,7 +1110,7 @@ suite('TreeMirror Fuzzer', function() {
     assertTreesEqual(testDiv, copy);
   }
 
-  function assertTreesEqual(node, copy) {
+  function assertTreesEqual(node:Node, copy:Node) {
     assert.strictEqual(node.tagName, copy.tagName);
     assert.strictEqual(node.id, copy.id);
 
@@ -1119,7 +1119,7 @@ suite('TreeMirror Fuzzer', function() {
       assert.strictEqual(node.attributes.length, copy.attributes.length);
       for (var i = 0; i < node.attributes.length; i++) {
         var attr = node.attributes[i];
-        assert.strictEqual(attr.value, copy.getAttribute(attr.name));
+        assert.strictEqual(attr.value, (<Element>copy).getAttribute(attr.name));
       }
     } else {
       assert.strictEqual(node.textContent, copy.textContent);
@@ -1139,11 +1139,11 @@ suite('TreeMirror Fuzzer', function() {
   // rather than linear.
   var nodePrivateIdCounter = 2;
 
-  function randomTree(root, numNodes) {
+  function randomTree(root:Node, numNodes:number) {
     var MAX_CHILDREN = 8;
 
-    function randDist(count, amount) {
-      var buckets = [];
+    function randDist(count:number, amount:number) {
+      var buckets:number[] = [];
 
       while(count-- > 0)
         buckets[count] = 0;
@@ -1212,7 +1212,7 @@ suite('TreeMirror Fuzzer', function() {
   }
 
   function randomNode(maybeText?:boolean):Node {
-    var node;
+    var node:Node;
     if (maybeText && !randInt(0, 8)) {
       var text = randomText();
       if (randInt(0, 1))
@@ -1225,27 +1225,26 @@ suite('TreeMirror Fuzzer', function() {
     return node;
   }
 
-  function randInt(start, end) {
+  function randInt(start:number, end:number) {
     return Math.round(Math.random() * (end-start) + start);
   }
 
-  function getReachable(root:Node, reachable, excludeRoot?:boolean) {
-    reachable = reachable || [];
+  function getReachable(root:Node, reachable:Node[], excludeRoot?:boolean) {
     if (!excludeRoot)
       reachable.push(root);
     if (!root.childNodes || ! root.childNodes.length)
-      return false;
+      return;
 
     for (var child = root.firstChild; child; child = child.nextSibling) {
       getReachable(child, reachable);
     }
 
-    return reachable;
+    return;
   }
 
-  function randomMutation(allNodes, nonRootNodes) {
+  function randomMutation(allNodes:Node[], nonRootNodes:Node[]) {
 
-    function nodeIsDescendant(root, target) {
+    function nodeIsDescendant(root:Node, target:Node) {
       if (!target)
         return false;
       if (root === target)
@@ -1254,16 +1253,16 @@ suite('TreeMirror Fuzzer', function() {
       return nodeIsDescendant(root, target.parentNode);
     }
 
-    function selectNodeAtRandom(nodes,
-                                excludeNodeAndDescendants?:boolean,
+    function selectNodeAtRandom(nodes:Node[],
+                                excludeNodeAndDescendants?:Node,
                                 isElement?:boolean):Node {
-      var node;
+      var node:Node;
       while (!node || nodeIsDescendant(excludeNodeAndDescendants, node) || (isElement && node.nodeType != Node.ELEMENT_NODE))
         node = nodes[randInt(0, nodes.length - 1)];
       return node;
     }
 
-    function moveNode(allNodes, node) {
+    function moveNode(allNodes:Node[], node:Node) {
       var parent = selectNodeAtRandom(allNodes, node, true);
       // NOTE: The random index here maybe be childNodes[childNodes.length]
       // which is undefined, meaning 'insert at end of childlist'.
@@ -1272,15 +1271,15 @@ suite('TreeMirror Fuzzer', function() {
       parent.insertBefore(node, beforeNode);
     }
 
-    function mutateAttribute(node) {
+    function mutateAttribute(node:Element) {
       var attrName = randomAttributeName();
       if (randInt(0, 1))
-        node.setAttribute(attrName, randInt(0, 9));
+        node.setAttribute(attrName, String(randInt(0, 9)));
       else
         node.removeAttribute(attrName);
     }
 
-    function mutateText(node) {
+    function mutateText(node:Node) {
       node.textContent = randomText();
     }
 
@@ -1294,6 +1293,6 @@ suite('TreeMirror Fuzzer', function() {
     if (node.nodeType == Node.TEXT_NODE)
       mutateText(node);
     else if (node.nodeType == Node.ELEMENT_NODE)
-      mutateAttribute(node);
+      mutateAttribute(<Element>node);
   }
 });

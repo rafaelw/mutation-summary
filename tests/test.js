@@ -1,3 +1,7 @@
+///<reference path='third_party/DefinitelyTyped/chai/chai-assert.d.ts'/>
+///<reference path='../src/mutation-summary.ts'/>
+///<reference path='../util/tree-mirror.ts'/>
+
 function compareNodeArrayIgnoreOrder(expected, actual) {
     assert.strictEqual(expected.length, actual.length);
 
@@ -77,6 +81,7 @@ suite('Mutation Summary', function () {
             });
         }
 
+        // reparented
         if (query.all || query.element) {
             assert(typeof expect.reparented === typeof changed.reparented);
             compareNodeArrayIgnoreOrder(expect.reparented, changed.reparented);
@@ -90,6 +95,7 @@ suite('Mutation Summary', function () {
             assert.isUndefined(changed.reparented);
         }
 
+        // reordered
         if (query.all) {
             assert(typeof expect.reordered == typeof changed.reordered);
             compareNodeArrayIgnoreOrder(expect.reordered, changed.reordered);
@@ -101,6 +107,7 @@ suite('Mutation Summary', function () {
             assert.isUndefined(changed.reordered);
         }
 
+        // valueChanged
         if (query.attribute || query.characterData) {
             assert(typeof expect.valueChanged == typeof changed.valueChanged);
             compareNodeArrayIgnoreOrder(expect.valueChanged, changed.valueChanged);
@@ -113,6 +120,7 @@ suite('Mutation Summary', function () {
             assert.isUndefined(changed.valueChanged);
         }
 
+        // attributeChanged
         if (query.all || query.elementAttributes) {
             assert(typeof expect.attributeChanged == typeof changed.attributeChanged);
             assert.strictEqual(Object.keys(expect.attributeChanged).length, Object.keys(changed.attributeChanged).length);
@@ -145,7 +153,7 @@ suite('Mutation Summary', function () {
         div.setAttribute('foo', '2');
 
         var summaries = observer.disconnect();
-        div.setAttribute('bar', '3');
+        div.setAttribute('bar', '3'); // should be ignored.
         observer.reconnect();
 
         // summaries returned from disconnect are handed in.
@@ -277,7 +285,7 @@ suite('Mutation Summary', function () {
         });
 
         text.textContent = 'bar';
-        text.textContent = 'bat';
+        text.textContent = 'bat'; // Restoring its original value should mean
 
         // we won't hear about the change.
         assertNothingReported();
@@ -838,11 +846,11 @@ suite('Mutation Summary', function () {
         testDiv.appendChild(divD);
         divD.id = 'd';
 
-        startObserving();
+        startObserving(); // A  B  C  D
 
-        insertAfter(testDiv, divB, null);
-        insertAfter(testDiv, divC, null);
-        insertAfter(testDiv, divD, null);
+        insertAfter(testDiv, divB, null); // [B] A  C  D
+        insertAfter(testDiv, divC, null); // [C  B] A  D
+        insertAfter(testDiv, divD, null); // [D  C  B] A
 
         // Final effect is [D  C  B] A
         assertSummary({
@@ -862,10 +870,10 @@ suite('Mutation Summary', function () {
         testDiv.appendChild(divC);
         divC.id = 'c';
 
-        startObserving();
+        startObserving(); // A  B  C
 
-        insertAfter(testDiv, divA, divC);
-        insertAfter(testDiv, divB, divA);
+        insertAfter(testDiv, divA, divC); // B  C [A]
+        insertAfter(testDiv, divB, divA); // C [A  B]
 
         // Final effect is C [A B]
         assertSummary({
@@ -896,14 +904,14 @@ suite('Mutation Summary', function () {
         var divG = document.createElement('div');
         divG.id = 'g';
 
-        startObserving();
+        startObserving(); // A  B  C  D  E  F
 
-        insertAfter(testDiv, divD, divA);
-        insertAfter(testDiv, divC, divA);
-        insertAfter(testDiv, divB, divC);
-        insertAfter(testDiv, divD, divA);
-        insertAfter(testDiv, divG, divE);
-        insertAfter(testDiv, divE, divG);
+        insertAfter(testDiv, divD, divA); // A [D] B  C  E  F
+        insertAfter(testDiv, divC, divA); // A [C  D] B  E  F
+        insertAfter(testDiv, divB, divC); // A [C  B  D] E  F
+        insertAfter(testDiv, divD, divA); // A [D  C  B] E  F
+        insertAfter(testDiv, divG, divE); // A [D  C  B] E [G] F
+        insertAfter(testDiv, divE, divG); // A [D  C  B  G  E] F
 
         // Final effect is A D [C B G] E F
         assertSummary({
@@ -925,11 +933,11 @@ suite('Mutation Summary', function () {
         testDiv.appendChild(divB);
         divB.id = 'b';
 
-        startObserving();
+        startObserving(); // A  B
 
-        insertAfter(testDiv, divA, divB);
-        insertAfter(testDiv, divB, divA);
-        insertAfter(testDiv, divA, divB);
+        insertAfter(testDiv, divA, divB); // B [A]
+        insertAfter(testDiv, divB, divA); // [A B]
+        insertAfter(testDiv, divA, divB); // [B A]
 
         // Final effect is B [A]
         assertSummary({
@@ -1151,6 +1159,7 @@ suite('TreeMirror Fuzzer', function () {
             var maybeText = childDist[i] <= 1;
             var child = root.appendChild(randomNode(maybeText));
 
+            // child.id = root.id + '.' + String.fromCharCode(65 + i);  // asci('A') + i.
             if (child.nodeType == Node.ELEMENT_NODE)
                 randomTree(child, childDist[i]);
         }
@@ -1202,7 +1211,7 @@ suite('TreeMirror Fuzzer', function () {
             var text = randomText();
             if (randInt(0, 1))
                 node = document.createTextNode(text);
-else
+            else
                 node = document.createComment(text);
         } else {
             node = document.createElement(randomTagname());
@@ -1215,17 +1224,16 @@ else
     }
 
     function getReachable(root, reachable, excludeRoot) {
-        reachable = reachable || [];
         if (!excludeRoot)
             reachable.push(root);
         if (!root.childNodes || !root.childNodes.length)
-            return false;
+            return;
 
         for (var child = root.firstChild; child; child = child.nextSibling) {
             getReachable(child, reachable);
         }
 
-        return reachable;
+        return;
     }
 
     function randomMutation(allNodes, nonRootNodes) {
@@ -1258,8 +1266,8 @@ else
         function mutateAttribute(node) {
             var attrName = randomAttributeName();
             if (randInt(0, 1))
-                node.setAttribute(attrName, randInt(0, 9));
-else
+                node.setAttribute(attrName, String(randInt(0, 9)));
+            else
                 node.removeAttribute(attrName);
         }
 
@@ -1276,8 +1284,7 @@ else
 
         if (node.nodeType == Node.TEXT_NODE)
             mutateText(node);
-else if (node.nodeType == Node.ELEMENT_NODE)
+        else if (node.nodeType == Node.ELEMENT_NODE)
             mutateAttribute(node);
     }
 });
-//# sourceMappingURL=test.js.map

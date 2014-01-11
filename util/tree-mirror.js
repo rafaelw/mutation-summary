@@ -1,4 +1,5 @@
 ///<reference path='../src/mutation-summary.ts'/>
+
 var TreeMirror = (function () {
     function TreeMirror(root, delegate) {
         this.root = root;
@@ -97,7 +98,7 @@ var TreeMirror = (function () {
 
                 Object.keys(nodeData.attributes).forEach(function (name) {
                     if (!_this.delegate || !_this.delegate.setAttribute || !_this.delegate.setAttribute(node, name, nodeData.attributes[name])) {
-                        (node).setAttribute(name, nodeData.attributes[name]);
+                        node.setAttribute(name, nodeData.attributes[name]);
                     }
                 });
 
@@ -309,4 +310,3 @@ var TreeMirrorClient = (function () {
     };
     return TreeMirrorClient;
 })();
-//# sourceMappingURL=tree-mirror.js.map

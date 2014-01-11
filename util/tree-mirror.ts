@@ -176,12 +176,12 @@ class TreeMirrorClient {
   private mutationSummary:MutationSummary;
   private knownNodes:NodeMap<number>;
 
-  constructor(public target:Node, public mirror:any, testingQueries) {
+  constructor(public target:Node, public mirror:any, testingQueries:Query[]) {
     this.nextId = 1;
     this.knownNodes = new MutationSummary.NodeMap<number>();
 
     var rootId = this.serializeNode(target).id;
-    var children = [];
+    var children:NodeData[] = [];
     for (var child = target.firstChild; child; child = child.nextSibling)
       children.push(this.serializeNode(child, true));
 

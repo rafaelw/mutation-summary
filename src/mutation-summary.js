@@ -1,9 +1,3 @@
-var __extends = this.__extends || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    __.prototype = b.prototype;
-    d.prototype = new __();
-};
 // Copyright 2011 Google Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +11,12 @@ var __extends = this.__extends || function (d, b) {
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+var __extends = this.__extends || function (d, b) {
+    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+    function __() { this.constructor = d; }
+    __.prototype = b.prototype;
+    d.prototype = new __();
+};
 var MutationObserverCtor;
 if (typeof WebKitMutationObserver !== 'undefined')
     MutationObserverCtor = WebKitMutationObserver;
@@ -94,7 +94,7 @@ var Movement;
 })(Movement || (Movement = {}));
 
 function enteredOrExited(changeType) {
-    return changeType === Movement.ENTERED || changeType === Movement.EXITED;
+    return changeType === 1 /* ENTERED */ || changeType === 5 /* EXITED */;
 }
 
 var NodeChange = (function () {
@@ -159,7 +159,7 @@ var NodeChange = (function () {
         this.childList = true;
         if (this.added || this.oldParentNode)
             this.added = false;
-else
+        else
             this.oldParentNode = parent;
     };
 
@@ -285,10 +285,10 @@ var TreeChanges = (function (_super) {
 
     TreeChanges.prototype.reachabilityChange = function (node) {
         if (this.getIsReachable(node)) {
-            return this.getWasReachable(node) ? Movement.STAYED_IN : Movement.ENTERED;
+            return this.getWasReachable(node) ? 2 /* STAYED_IN */ : 1 /* ENTERED */;
         }
 
-        return this.getWasReachable(node) ? Movement.EXITED : Movement.STAYED_OUT;
+        return this.getWasReachable(node) ? 5 /* EXITED */ : 0 /* STAYED_OUT */;
     };
     return TreeChanges;
 })(NodeMap);
@@ -331,36 +331,38 @@ var MutationProjection = (function () {
         var change = this.treeChanges.get(node);
         var reachable = parentReachable;
 
+        // node inherits its parent's reachability change unless
+        // its parentNode was mutated.
         if ((change && change.childList) || reachable == undefined)
             reachable = this.treeChanges.reachabilityChange(node);
 
-        if (reachable === Movement.STAYED_OUT)
+        if (reachable === 0 /* STAYED_OUT */)
             return;
 
         // Cache match results for sub-patterns.
         this.matchabilityChange(node);
 
-        if (reachable === Movement.ENTERED) {
+        if (reachable === 1 /* ENTERED */) {
             this.entered.push(node);
-        } else if (reachable === Movement.EXITED) {
+        } else if (reachable === 5 /* EXITED */) {
             this.exited.push(node);
             this.ensureHasOldPreviousSiblingIfNeeded(node);
-        } else if (reachable === Movement.STAYED_IN) {
-            var movement = Movement.STAYED_IN;
+        } else if (reachable === 2 /* STAYED_IN */) {
+            var movement = 2 /* STAYED_IN */;
 
             if (change && change.childList) {
                 if (change.oldParentNode !== node.parentNode) {
-                    movement = Movement.REPARENTED;
+                    movement = 3 /* REPARENTED */;
                     this.ensureHasOldPreviousSiblingIfNeeded(node);
                 } else if (this.calcReordered && this.wasReordered(node)) {
-                    movement = Movement.REORDERED;
+                    movement = 4 /* REORDERED */;
                 }
             }
 
             this.stayedIn.set(node, movement);
         }
 
-        if (reachable === Movement.STAYED_IN)
+        if (reachable === 2 /* STAYED_IN */)
             return;
 
         for (var child = node.firstChild; child; child = child.nextSibling) {
@@ -397,7 +399,7 @@ var MutationProjection = (function () {
         for (var i = 0; i < this.entered.length; i++) {
             var node = this.entered[i];
             var matchable = this.matchabilityChange(node);
-            if (matchable === Movement.ENTERED || matchable === Movement.STAYED_IN)
+            if (matchable === 1 /* ENTERED */ || matchable === 2 /* STAYED_IN */)
                 summary.added.push(node);
         }
 
@@ -406,15 +408,15 @@ var MutationProjection = (function () {
             var node = stayedInNodes[i];
             var matchable = this.matchabilityChange(node);
 
-            if (matchable === Movement.ENTERED) {
+            if (matchable === 1 /* ENTERED */) {
                 summary.added.push(node);
-            } else if (matchable === Movement.EXITED) {
+            } else if (matchable === 5 /* EXITED */) {
                 summary.removed.push(node);
-            } else if (matchable === Movement.STAYED_IN && (summary.reparented || summary.reordered)) {
+            } else if (matchable === 2 /* STAYED_IN */ && (summary.reparented || summary.reordered)) {
                 var movement = this.stayedIn.get(node);
-                if (summary.reparented && movement === Movement.REPARENTED)
+                if (summary.reparented && movement === 3 /* REPARENTED */)
                     summary.reparented.push(node);
-else if (summary.reordered && movement === Movement.REORDERED)
+                else if (summary.reordered && movement === 4 /* REORDERED */)
                     summary.reordered.push(node);
             }
         }
@@ -422,7 +424,7 @@ else if (summary.reordered && movement === Movement.REORDERED)
         for (var i = 0; i < this.exited.length; i++) {
             var node = this.exited[i];
             var matchable = this.matchabilityChange(node);
-            if (matchable === Movement.EXITED || matchable === Movement.STAYED_IN)
+            if (matchable === 5 /* EXITED */ || matchable === 2 /* STAYED_IN */)
                 summary.removed.push(node);
         }
     };
@@ -433,7 +435,7 @@ else if (summary.reordered && movement === Movement.REORDERED)
             return change.oldParentNode ? change.oldParentNode : null;
 
         var reachabilityChange = this.treeChanges.reachabilityChange(node);
-        if (reachabilityChange === Movement.STAYED_OUT || reachabilityChange === Movement.ENTERED)
+        if (reachabilityChange === 0 /* STAYED_OUT */ || reachabilityChange === 1 /* ENTERED */)
             throw Error('getOldParentNode requested on invalid node.');
 
         return node.parentNode;
@@ -490,7 +492,7 @@ else if (summary.reordered && movement === Movement.REORDERED)
             if (!change.attributes)
                 continue;
 
-            if (Movement.STAYED_IN !== this.treeChanges.reachabilityChange(node) || Movement.STAYED_IN !== this.matchabilityChange(node)) {
+            if (2 /* STAYED_IN */ !== this.treeChanges.reachabilityChange(node) || 2 /* STAYED_IN */ !== this.matchabilityChange(node)) {
                 continue;
             }
 
@@ -534,7 +536,7 @@ else if (summary.reordered && movement === Movement.REORDERED)
         var result = [];
         for (var i = 0; i < nodes.length; i++) {
             var target = nodes[i];
-            if (Movement.STAYED_IN !== this.treeChanges.reachabilityChange(target))
+            if (2 /* STAYED_IN */ !== this.treeChanges.reachabilityChange(target))
                 continue;
 
             var change = this.treeChanges.get(target);
@@ -564,21 +566,25 @@ else if (summary.reordered && movement === Movement.REORDERED)
 
     MutationProjection.prototype.matchabilityChange = function (node) {
         var _this = this;
+        // TODO(rafaelw): Include PI, CDATA?
+        // Only include text nodes.
         if (this.characterDataOnly) {
             switch (node.nodeType) {
                 case Node.COMMENT_NODE:
                 case Node.TEXT_NODE:
-                    return Movement.STAYED_IN;
+                    return 2 /* STAYED_IN */;
                 default:
-                    return Movement.STAYED_OUT;
+                    return 0 /* STAYED_OUT */;
             }
         }
 
+        // No element filter. Include all nodes.
         if (!this.selectors)
-            return Movement.STAYED_IN;
+            return 2 /* STAYED_IN */;
 
+        // Element filter. Exclude non-elements.
         if (node.nodeType !== Node.ELEMENT_NODE)
-            return Movement.STAYED_OUT;
+            return 0 /* STAYED_OUT */;
 
         var el = node;
 
@@ -586,25 +592,25 @@ else if (summary.reordered && movement === Movement.REORDERED)
             return _this.computeMatchabilityChange(selector, el);
         });
 
-        var accum = Movement.STAYED_OUT;
+        var accum = 0 /* STAYED_OUT */;
         var i = 0;
 
-        while (accum !== Movement.STAYED_IN && i < matchChanges.length) {
+        while (accum !== 2 /* STAYED_IN */ && i < matchChanges.length) {
             switch (matchChanges[i]) {
-                case Movement.STAYED_IN:
-                    accum = Movement.STAYED_IN;
+                case 2 /* STAYED_IN */:
+                    accum = 2 /* STAYED_IN */;
                     break;
-                case Movement.ENTERED:
-                    if (accum === Movement.EXITED)
-                        accum = Movement.STAYED_IN;
-else
-                        accum = Movement.ENTERED;
+                case 1 /* ENTERED */:
+                    if (accum === 5 /* EXITED */)
+                        accum = 2 /* STAYED_IN */;
+                    else
+                        accum = 1 /* ENTERED */;
                     break;
-                case Movement.EXITED:
-                    if (accum === Movement.ENTERED)
-                        accum = Movement.STAYED_IN;
-else
-                        accum = Movement.EXITED;
+                case 5 /* EXITED */:
+                    if (accum === 1 /* ENTERED */)
+                        accum = 2 /* STAYED_IN */;
+                    else
+                        accum = 5 /* EXITED */;
                     break;
             }
 
@@ -635,7 +641,7 @@ else
             if (mutation.type != 'childList')
                 continue;
 
-            if (this.treeChanges.reachabilityChange(mutation.target) !== Movement.STAYED_IN && !this.calcOldPreviousSibling)
+            if (this.treeChanges.reachabilityChange(mutation.target) !== 2 /* STAYED_IN */ && !this.calcOldPreviousSibling)
                 continue;
 
             var change = this.getChildlistChange(mutation.target);
@@ -798,7 +804,7 @@ var Summary = (function () {
 
             if (query.characterData)
                 this.valueChanged = characterDataChanged;
-else
+            else
                 this.characterDataChanged = characterDataChanged;
         }
 
@@ -934,9 +940,9 @@ var Selector = (function () {
     Selector.prototype.matchabilityChange = function (el, change) {
         var isMatching = this.isMatching(el);
         if (isMatching)
-            return this.wasMatching(el, change, isMatching) ? Movement.STAYED_IN : Movement.ENTERED;
-else
-            return this.wasMatching(el, change, isMatching) ? Movement.EXITED : Movement.STAYED_OUT;
+            return this.wasMatching(el, change, isMatching) ? 2 /* STAYED_IN */ : 1 /* ENTERED */;
+        else
+            return this.wasMatching(el, change, isMatching) ? 5 /* EXITED */ : 0 /* STAYED_OUT */;
     };
 
     Selector.parseSelectors = function (input) {
@@ -1392,7 +1398,7 @@ var MutationSummary = (function () {
             return query.all;
         });
 
-        this.queryValidators = [];
+        this.queryValidators = []; // TODO(rafaelw): Shouldn't always define this.
         if (MutationSummary.createQueryValidator) {
             this.queryValidators = this.options.queries.map(function (query) {
                 return MutationSummary.createQueryValidator(_this.root, query);
@@ -1486,6 +1492,7 @@ var MutationSummary = (function () {
         for (var i = 0; i < options.queries.length; i++) {
             var request = options.queries[i];
 
+            // all
             if (request.all) {
                 if (Object.keys(request).length > 1)
                     throw Error('Invalid request option. all has no options.');
@@ -1494,6 +1501,7 @@ var MutationSummary = (function () {
                 continue;
             }
 
+            // attribute
             if ('attribute' in request) {
                 var query = {
                     attribute: validateAttribute(request.attribute)
@@ -1508,6 +1516,7 @@ var MutationSummary = (function () {
                 continue;
             }
 
+            // element
             if ('element' in request) {
                 var requestOptionCount = Object.keys(request).length;
                 var query = {
@@ -1527,6 +1536,7 @@ var MutationSummary = (function () {
                 continue;
             }
 
+            // characterData
             if (request.characterData) {
                 if (Object.keys(request).length > 1)
                     throw Error('Invalid request option. characterData has no options.');
@@ -1572,13 +1582,8 @@ var MutationSummary = (function () {
     MutationSummary.prototype.changesToReport = function (summaries) {
         return summaries.some(function (summary) {
             var summaryProps = [
-                'added',
-                'removed',
-                'reordered',
-                'reparented',
-                'valueChanged',
-                'characterDataChanged'
-            ];
+                'added', 'removed', 'reordered', 'reparented',
+                'valueChanged', 'characterDataChanged'];
             if (summaryProps.some(function (prop) {
                 return summary[prop] && summary[prop].length;
             }))
@@ -1609,6 +1614,7 @@ var MutationSummary = (function () {
         if (this.changesToReport(summaries))
             this.callback(summaries);
 
+        // disconnect() may have been called during the callback.
         if (!this.options.observeOwnChanges && this.connected) {
             this.checkpointQueryValidators();
             this.observer.observe(this.root, this.observerOptions);
@@ -1650,4 +1656,3 @@ var MutationSummary = (function () {
     };
     return MutationSummary;
 })();
-//# sourceMappingURL=mutation-summary.js.map
