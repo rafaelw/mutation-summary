@@ -14,10 +14,11 @@ The [W3C WebApps working group](http://www.w3.org/2008/webapps/) took up the tas
 
 Here are the main differences between Mutation Events and Mutation Observers
 
-|| || *Mutation Events* || *Mutation Observers* ||
-|| Events? || Yes (slow) || No (just function callbacks) ||
-|| When? || Synchronous (i.e. right now) || Asynchronous (i.e. later) ||
-|| How many? || One per change || Multiple changes delivered in a single call ||
+ |       |Mutation Events | Mutation Observers|
+ |----|--------------|-----------------|
+ |Events? | Yes (slow) | No (just function callbacks) |
+ |When? | Synchronous (i.e. right now) | Asynchronous (i.e. later) |
+ |How many? | One per change | Multiple changes delivered in a single call|
 
 #Mutation Observers vs. Mutation Summary (this library)
 
