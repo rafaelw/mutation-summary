@@ -3,7 +3,7 @@
 This document is a tutorial that describes how to use the Mutation Summary library to watch a web page for various kinds of changes.
 
 Other resources:
-  * A [high-level overview](http://code.google.com/p/mutation-summary) of what this library is, how it can help you, and the new [DOM Mutation Observers](http://dvcs.w3.org/hg/domcore/raw-file/tip/Overview.html#mutation-observers) browser API on which it depends.
+  * A [high-level overview](https://github.com/rafaelw/mutation-summary) of what this library is, how it can help you, and the new [DOM Mutation Observers](http://dvcs.w3.org/hg/domcore/raw-file/tip/Overview.html#mutation-observers) browser API on which it depends.
   * The MutationSummary [API reference](APIReference.md) document.
 
 # Observing a single attribute #
