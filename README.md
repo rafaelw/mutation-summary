@@ -1,9 +1,3 @@
-# WARNING: This is not yet the official repo. #
-
-I am currently in the process of transitioning from googlecode to github. If you want to be sure you have the latest code or want to submit a bug please go to [Mutation Summary at Google Code](https://code.google.com/p/mutation-summary/).
-
-When I complete the transition I will remove this message and point the Google Code page to this repo.
-
 # What is this? #
 
 Mutation Summary is a JavaScript library that makes observing changes to the DOM fast, easy and safe.
