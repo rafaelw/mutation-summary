@@ -321,7 +321,7 @@ class TreeMirrorClient {
       attributeChanged[attrName].forEach((element) => {
         var record = map.get(element);
         if (!record) {
-          record = this.serializeNode(element);
+          record = <AttributeData>this.serializeNode(element);
           record.attributes = {};
           map.set(element, record);
         }

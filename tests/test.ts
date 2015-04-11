@@ -22,7 +22,7 @@ function compareNodeArrayIgnoreOrder(expected:Node[], actual:Node[]) {
 
 suite('Mutation Summary', function() {
 
-  var testDiv:Element;
+  var testDiv:HTMLElement;
   var observer:MutationSummary;
   var observing:boolean;
   var changed:Node[];
@@ -217,10 +217,10 @@ suite('Mutation Summary', function() {
     div2.setAttribute('foo', 'baz2');
     assertNothingReported();
   });
-  
+
   test('Attribute -- Array proto changed', function() {
     Array.prototype.foo = 'bar';
-    
+
     var div = document.createElement('div');
     testDiv.appendChild(div);
     div.setAttribute('foo', 'bar');
@@ -1075,7 +1075,7 @@ suite('Mutation Summary', function() {
 
 suite('TreeMirror Fuzzer', function() {
 
-  var testDiv:Element;
+  var testDiv:HTMLElement;
 
   setup(function() {
     testDiv = document.createElement('div');
@@ -1122,7 +1122,7 @@ suite('TreeMirror Fuzzer', function() {
     testingQueries.push(elementQuery);
 
     var pass = 0;
-    var mirrorRoot = testDiv.cloneNode(false);
+    var mirrorRoot = <HTMLElement> testDiv.cloneNode(false);
     var mirrorClient = new TreeMirrorClient(testDiv, new TreeMirror(mirrorRoot), testingQueries);
 
     function doNextPass() {
@@ -1151,10 +1151,10 @@ suite('TreeMirror Fuzzer', function() {
   function testRandomCloneAndTestCopy() {
     randomTree(testDiv, 512);
     var copy = testDiv.cloneNode(true);
-    assertTreesEqual(testDiv, copy);
+    assertTreesEqual(<HTMLElement>testDiv, <HTMLElement>copy);
   }
 
-  function assertTreesEqual(node:Node, copy:Node) {
+  function assertTreesEqual(node:HTMLElement, copy:HTMLElement) {
     assert.strictEqual(node.tagName, copy.tagName);
     assert.strictEqual(node.id, copy.id);
 
@@ -1173,7 +1173,7 @@ suite('TreeMirror Fuzzer', function() {
 
     var copyChild = copy.firstChild;
     for (var child = node.firstChild; child; child = child.nextSibling) {
-      assertTreesEqual(child, copyChild);
+      assertTreesEqual(<HTMLElement>child, <HTMLElement>copyChild);
       copyChild = copyChild.nextSibling;
     }
   }

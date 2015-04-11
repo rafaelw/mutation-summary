@@ -46,7 +46,7 @@ class NodeMap<T> {
   }
 
   private isIndex(s:string):boolean {
-    return +s === s >>> 0;
+    return +s === <any>s >>> 0;
   }
 
   private nodeId(node:Node) {
@@ -84,7 +84,7 @@ class NodeMap<T> {
         continue;
       nodes.push(this.nodes[id]);
     }
-    
+
     return nodes;
   }
 }
