@@ -65,7 +65,7 @@ suite('Mutation Summary', function () {
             });
         }
         // reparented
-        if (query.all || query.element) {
+        if (query.all || query.element || query.characterData) {
             assert(typeof expect.reparented === typeof changed.reparented);
             compareNodeArrayIgnoreOrder(expect.reparented, changed.reparented);
             if (options.oldPreviousSibling) {
@@ -263,6 +263,7 @@ suite('Mutation Summary', function () {
         var div2 = testDiv.appendChild(document.createElement('div'));
         assertSummary({
             added: [comment2],
+            reparented: [],
             valueChanged: [text, comment],
             oldValues: ['foo', '123']
         });
@@ -271,6 +272,7 @@ suite('Mutation Summary', function () {
         div.removeChild(comment2);
         assertSummary({
             removed: [comment2],
+            reparented: [],
             valueChanged: [text],
             oldValues: ['bar']
         });
@@ -278,6 +280,12 @@ suite('Mutation Summary', function () {
         text.textContent = 'bat'; // Restoring its original value should mean
         // we won't hear about the change.
         assertNothingReported();
+        div2.appendChild(text);
+        assertSummary({
+            reparented: [text],
+            valueChanged: [],
+            oldValues: []
+        });
     });
     test('Element Basic', function () {
         startObserving({

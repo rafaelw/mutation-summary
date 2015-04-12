@@ -678,7 +678,7 @@ var Summary = (function () {
         this.projection = projection;
         this.added = [];
         this.removed = [];
-        this.reparented = query.all || query.element ? [] : undefined;
+        this.reparented = query.all || query.element || query.characterData ? [] : undefined;
         this.reordered = query.all ? [] : undefined;
         projection.getChanged(this, query.elementFilter, query.characterData);
         if (query.all || query.attribute || query.attributeList) {
