@@ -184,6 +184,7 @@ Summarize the effective changes to the presence and value of characterData nodes
 {
  added: [ array of <node> ],
  removed: [ array of <node> ],
+ reparented: [ array of <node> ],
  valueChanged: [ array of <node> ],
  getOldCharacterData: function(node) { … },
  getOldParentNode: function(node) { ... }
@@ -192,6 +193,7 @@ Summarize the effective changes to the presence and value of characterData nodes
 
   * **`added`**. All character data nodes presently in the subtree, but previously were not in the subtree.
   * **`removed`**. All character data nodes previously in the subtree, which now are not in the subtree.
+  * **`reparented`**. All character data nodes previously & presently in the subtree, which were moved to be children of a new parent (their present parentNode is distinct from the previous parentNode).
   * **`valueChanged`**. All character data nodes previously & presently whose value changed.
   * **`getOldCharacterData`**. a function which will retrieve the previous value of `node`. `node` must be  contained in the `valueChanged` node array, otherwise the function throws an error.
   * **`getOldParentNode`**. a function which will retrieve the previous parentNode for _node_. _node_ must be contained in the removed element array, otherwise the function throws an error.
