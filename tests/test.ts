@@ -8,7 +8,7 @@ declare var setup:(a:any)=>any;
 declare var teardown:(a:any)=>any;
 
 function compareNodeArrayIgnoreOrder(expected:Node[], actual:Node[]) {
-  assert.strictEqual(expected.length, actual.length);
+  assert.strictEqual(actual.length, expected.length);
 
   var map = new MutationSummary.NodeMap<boolean>();
   expected.forEach(function(node) {
@@ -83,7 +83,7 @@ suite('Mutation Summary', function() {
 
     if (options.oldPreviousSibling) {
       expect.removed.forEach(function(node:Node, index:number) {
-        assert.strictEqual(expect.removedOldPreviousSibling[index], changed.getOldPreviousSibling(node));
+        assert.strictEqual(changed.getOldPreviousSibling(node), expect.removedOldPreviousSibling[index]);
       });
     }
 
@@ -94,7 +94,7 @@ suite('Mutation Summary', function() {
 
       if (options.oldPreviousSibling) {
         expect.reparented.forEach(function(node:Node, index:number) {
-          assert.strictEqual(expect.reparentedOldPreviousSibling[index], changed.getOldPreviousSibling(node));
+          assert.strictEqual(changed.getOldPreviousSibling(node), expect.reparentedOldPreviousSibling[index]);
         });
       }
     } else {
@@ -107,7 +107,7 @@ suite('Mutation Summary', function() {
       compareNodeArrayIgnoreOrder(expect.reordered, changed.reordered);
 
       expect.reordered.forEach(function(node:Node, index:number) {
-        assert.strictEqual(expect.reorderedOldPreviousSibling[index], changed.getOldPreviousSibling(node));
+        assert.strictEqual(changed.getOldPreviousSibling(node), expect.reorderedOldPreviousSibling[index]);
       });
     } else {
       assert.isUndefined(changed.reordered);
@@ -120,7 +120,7 @@ suite('Mutation Summary', function() {
       var getOldFunction = query.attribute ? 'getOldAttribute' : 'getOldCharacterData';
 
       expect.valueChanged.forEach(function(node:Node, index:number) {
-        assert.strictEqual(expect.oldValues[index], changed[getOldFunction](node, query.attribute));
+        assert.strictEqual(changed[getOldFunction](node, query.attribute), expect.oldValues[index]);
       });
     } else {
       assert.isUndefined(changed.valueChanged);
@@ -129,12 +129,12 @@ suite('Mutation Summary', function() {
     // attributeChanged
     if (query.all || query.elementAttributes) {
       assert(typeof expect.attributeChanged == typeof changed.attributeChanged);
-      assert.strictEqual(Object.keys(expect.attributeChanged).length, Object.keys(changed.attributeChanged).length);
+      assert.strictEqual(Object.keys(changed.attributeChanged).length, Object.keys(expect.attributeChanged).length);
 
       Object.keys(expect.attributeChanged).forEach(function(attrName) {
         compareNodeArrayIgnoreOrder(expect.attributeChanged[attrName], changed.attributeChanged[attrName]);
         expect.attributeOldValue[attrName].forEach(function(attrOldValue:string, index:number) {
-          assert.strictEqual(expect.attributeOldValue[attrName][index], changed.getOldAttribute(expect.attributeChanged[attrName][index], attrName));
+          assert.strictEqual(changed.getOldAttribute(expect.attributeChanged[attrName][index], attrName), expect.attributeOldValue[attrName][index]);
         });
       });
     } else {
@@ -359,7 +359,8 @@ suite('Mutation Summary', function() {
 
   test('Element Attribute Specified', function() {
     startObserving({
-      element: 'div[foo], A, *[bar], div[ baz = "bat"], span#foo[blow~=blarg]'
+      element: 'div[foo], A, *[bar], div[ baz = "bat"], span#foo[blow~=blarg], span[some^=thing], span[another$=.html], ' +
+        'span[splat*=atat], div[lang|=en]'
     });
 
     var div = document.createElement('div');
@@ -377,6 +378,18 @@ suite('Mutation Summary', function() {
     var p = document.createElement('P');
     testDiv.appendChild(p);
     p.setAttribute('baz', 'baz');
+    var span2 = document.createElement('span');
+    span2.setAttribute('some', 'not a thing');
+    div2.appendChild(span2);
+    var span3 = document.createElement('span');
+    span3.setAttribute('another', '.html at the front');
+    div3.appendChild(span3);
+    var span4 = document.createElement('span');
+    span4.setAttribute('splat', 'no at at');
+    p.appendChild(span4);
+    var div4 = document.createElement('div');
+    testDiv.appendChild(div4);
+    div4.setAttribute('lang', 'not-en-matching');
     assertSummary({
       added: [div]
     });
@@ -387,13 +400,18 @@ suite('Mutation Summary', function() {
     div3.setAttribute('baz', 'bat');
     span.id = 'foo';
     span.setAttribute('blow', 'blarg bloog');
+    span2.setAttribute('some', 'thinggood');
+    span3.setAttribute('another', 'this one ends in.html');
+    span4.setAttribute('splat', 'some-atat-thing');
+    div4.setAttribute('lang', 'en-yes');
     assertSummary({
-      added: [p, div3, span],
+      added: [p, div3, span, span2, span3, span4, div4],
       removed: [div]
     });
 
     div3.removeAttribute('baz');
     div3.setAttribute('baz', 'bat');
+    div4.setAttribute('lang', 'en');
     assertNothingReported();
   });
 
@@ -1005,14 +1023,14 @@ suite('Mutation Summary', function() {
         count++;
 
         if (count == 1) {
-          assert.strictEqual(1, summary.added.length)
+          assert.strictEqual(summary.added.length, 1)
           div = testDiv.appendChild(document.createElement('div'));
         } else if (count == 2) {
-          assert.strictEqual(2, summary.added.length);
+          assert.strictEqual(summary.added.length, 2);
           div = testDiv.appendChild(document.createElement('div'));
           summary1.disconnect();
         } else if (count == 3) {
-          assert.strictEqual(1, summary.added.length);
+          assert.strictEqual(summary.added.length, 1);
           summary1.disconnect();
           async();
         }
@@ -1027,14 +1045,14 @@ suite('Mutation Summary', function() {
         count++;
 
         if (count == 1) {
-          assert.strictEqual(1, summary.added.length)
+          assert.strictEqual(summary.added.length, 1)
           div = testDiv.appendChild(document.createElement('div'));
         } else if (count == 2) {
-          assert.strictEqual(2, summary.added.length);
+          assert.strictEqual(summary.added.length, 2);
           div = testDiv.appendChild(document.createElement('div'));
           summary2.disconnect();
         } else if (count == 3) {
-          assert.strictEqual(1, summary.added.length);
+          assert.strictEqual(summary.added.length, 1);
           summary2.disconnect();
           async();
         }
@@ -1061,7 +1079,7 @@ suite('Mutation Summary', function() {
         setTimeout(function() {
           div.setAttribute('bar', 'baz');
           setTimeout(function() {
-            assert.strictEqual(1, callbackCount);
+            assert.strictEqual(callbackCount, 1);
             async();
           });
         }, 0);
@@ -1155,21 +1173,21 @@ suite('TreeMirror Fuzzer', function() {
   }
 
   function assertTreesEqual(node:Node, copy:Node) {
-    assert.strictEqual(node.tagName, copy.tagName);
-    assert.strictEqual(node.id, copy.id);
+    assert.strictEqual(copy.tagName, node.tagName);
+    assert.strictEqual(copy.id, node.id);
 
-    assert.strictEqual(node.nodeType, copy.nodeType);
+    assert.strictEqual(copy.nodeType, node.nodeType);
     if (node.nodeType == Node.ELEMENT_NODE) {
-      assert.strictEqual(node.attributes.length, copy.attributes.length);
+      assert.strictEqual(copy.attributes.length, node.attributes.length);
       for (var i = 0; i < node.attributes.length; i++) {
         var attr = node.attributes[i];
-        assert.strictEqual(attr.value, (<Element>copy).getAttribute(attr.name));
+        assert.strictEqual((<Element>copy).getAttribute(attr.name), attr.value);
       }
     } else {
-      assert.strictEqual(node.textContent, copy.textContent);
+      assert.strictEqual(copy.textContent, node.textContent);
     }
 
-    assert.strictEqual(node.childNodes.length, copy.childNodes.length);
+    assert.strictEqual(copy.childNodes.length, node.childNodes.length);
 
     var copyChild = copy.firstChild;
     for (var child = node.firstChild; child; child = child.nextSibling) {

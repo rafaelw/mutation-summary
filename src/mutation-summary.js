@@ -35,7 +35,7 @@ var NodeMap = (function () {
         this.values = [];
     }
     NodeMap.prototype.isIndex = function (s) {
-        return +s === s >>> 0;
+        return +s === +s >>> 0;
     };
 
     NodeMap.prototype.nodeId = function (node) {
@@ -301,7 +301,7 @@ var TreeChanges = (function (_super) {
 })(NodeMap);
 
 var MutationProjection = (function () {
-    // TOOD(any)
+    // TODO(any)
     function MutationProjection(rootNode, mutations, selectors, calcReordered, calcOldPreviousSibling) {
         this.rootNode = rootNode;
         this.mutations = mutations;
@@ -847,8 +847,19 @@ function escapeQuotes(value) {
     return '"' + value.replace(/"/, '\\\"') + '"';
 }
 
+var Modifier;
+(function (Modifier) {
+    Modifier[Modifier["none"] = 0] = "none";
+    Modifier[Modifier["containsToken"] = 1] = "containsToken";
+    Modifier[Modifier["startsWith"] = 2] = "startsWith";
+    Modifier[Modifier["endsWith"] = 3] = "endsWith";
+    Modifier[Modifier["containsAny"] = 4] = "containsAny";
+    Modifier[Modifier["startsHyphen"] = 5] = "startsHyphen";
+})(Modifier || (Modifier = {}));
+
 var Qualifier = (function () {
     function Qualifier() {
+        this.modifier = 0 /* none */;
     }
     Qualifier.prototype.matches = function (oldValue) {
         if (oldValue === null)
@@ -857,8 +868,20 @@ var Qualifier = (function () {
         if (this.attrValue === undefined)
             return true;
 
-        if (!this.contains)
+        if (this.modifier == 0 /* none */)
             return this.attrValue == oldValue;
+
+        if (this.modifier == 2 /* startsWith */)
+            return this.attrValue == oldValue.slice(0, this.attrValue.length);
+
+        if (this.modifier == 3 /* endsWith */)
+            return this.attrValue == oldValue.slice(-this.attrValue.length);
+
+        if (this.modifier == 4 /* containsAny */)
+            return oldValue.indexOf(this.attrValue) != -1;
+
+        if (this.modifier == 5 /* startsHyphen */)
+            return this.attrValue == oldValue || (this.attrValue + '-') == oldValue.slice(0, this.attrValue.length + 1);
 
         var tokens = oldValue.split(' ');
         for (var i = 0; i < tokens.length; i++) {
@@ -870,14 +893,26 @@ var Qualifier = (function () {
     };
 
     Qualifier.prototype.toString = function () {
-        if (this.attrName === 'class' && this.contains)
+        if (this.attrName === 'class' && this.modifier == 1 /* containsToken */)
             return '.' + this.attrValue;
 
-        if (this.attrName === 'id' && !this.contains)
+        if (this.attrName === 'id' && this.modifier == 0 /* none */)
             return '#' + this.attrValue;
 
-        if (this.contains)
+        if (this.modifier == 1 /* containsToken */)
             return '[' + this.attrName + '~=' + escapeQuotes(this.attrValue) + ']';
+
+        if (this.modifier == 2 /* startsWith */)
+            return '[' + this.attrName + '^=' + escapeQuotes(this.attrValue) + ']';
+
+        if (this.modifier == 3 /* endsWith */)
+            return '[' + this.attrName + '$=' + escapeQuotes(this.attrValue) + ']';
+
+        if (this.modifier == 4 /* containsAny */)
+            return '[' + this.attrName + '*=' + escapeQuotes(this.attrValue) + ']';
+
+        if (this.modifier == 5 /* startsHyphen */)
+            return '[' + this.attrName + '|=' + escapeQuotes(this.attrValue) + ']';
 
         if ('attrValue' in this)
             return '[' + this.attrName + '=' + escapeQuotes(this.attrValue) + ']';
@@ -1021,7 +1056,7 @@ var Selector = (function () {
                         newQualifier();
                         currentSelector.tagName = '*';
                         currentQualifier.attrName = 'class';
-                        currentQualifier.contains = true;
+                        currentQualifier.modifier = 1 /* containsToken */;
                         state = QUALIFIER_NAME_FIRST_CHAR;
                         break;
                     }
@@ -1056,7 +1091,7 @@ var Selector = (function () {
                     if (c == '.') {
                         newQualifier();
                         currentQualifier.attrName = 'class';
-                        currentQualifier.contains = true;
+                        currentQualifier.modifier = 1 /* containsToken */;
                         state = QUALIFIER_NAME_FIRST_CHAR;
                         break;
                     }
@@ -1089,7 +1124,7 @@ var Selector = (function () {
                     if (c == '.') {
                         newQualifier();
                         currentQualifier.attrName = 'class';
-                        currentQualifier.contains = true;
+                        currentQualifier.modifier = 1 /* containsToken */;
                         state = QUALIFIER_NAME_FIRST_CHAR;
                         break;
                     }
@@ -1136,7 +1171,7 @@ var Selector = (function () {
                     if (c == '.') {
                         newQualifier();
                         currentQualifier.attrName = 'class';
-                        currentQualifier.contains = true;
+                        currentQualifier.modifier = 1 /* containsToken */;
                         state = QUALIFIER_NAME_FIRST_CHAR;
                         break;
                     }
@@ -1187,7 +1222,31 @@ var Selector = (function () {
                     }
 
                     if (c == '~') {
-                        currentQualifier.contains = true;
+                        currentQualifier.modifier = 1 /* containsToken */;
+                        state = EQUAL;
+                        break;
+                    }
+
+                    if (c == '^') {
+                        currentQualifier.modifier = 2 /* startsWith */;
+                        state = EQUAL;
+                        break;
+                    }
+
+                    if (c == '$') {
+                        currentQualifier.modifier = 3 /* endsWith */;
+                        state = EQUAL;
+                        break;
+                    }
+
+                    if (c == '*') {
+                        currentQualifier.modifier = 4 /* containsAny */;
+                        state = EQUAL;
+                        break;
+                    }
+
+                    if (c == '|') {
+                        currentQualifier.modifier = 5 /* startsHyphen */;
                         state = EQUAL;
                         break;
                     }
@@ -1207,7 +1266,31 @@ var Selector = (function () {
 
                 case EQUIV_OR_ATTR_QUAL_END:
                     if (c == '~') {
-                        currentQualifier.contains = true;
+                        currentQualifier.modifier = 1 /* containsToken */;
+                        state = EQUAL;
+                        break;
+                    }
+
+                    if (c == '^') {
+                        currentQualifier.modifier = 2 /* startsWith */;
+                        state = EQUAL;
+                        break;
+                    }
+
+                    if (c == '$') {
+                        currentQualifier.modifier = 3 /* endsWith */;
+                        state = EQUAL;
+                        break;
+                    }
+
+                    if (c == '*') {
+                        currentQualifier.modifier = 4 /* containsAny */;
+                        state = EQUAL;
+                        break;
+                    }
+
+                    if (c == '|') {
+                        currentQualifier.modifier = 5 /* startsHyphen */;
                         state = EQUAL;
                         break;
                     }
