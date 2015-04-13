@@ -278,7 +278,7 @@ class TreeMirrorClient {
 
     all.forEach((node) => {
       var parent = node.parentNode;
-      var children = parentMap.get(parent)
+      var children = parentMap.get(parent);
       if (!children) {
         children = new MutationSummary.NodeMap<boolean>();
         parentMap.set(parent, children);
@@ -321,7 +321,7 @@ class TreeMirrorClient {
       attributeChanged[attrName].forEach((element) => {
         var record = map.get(element);
         if (!record) {
-          record = this.serializeNode(element);
+          record = <AttributeData>this.serializeNode(element);
           record.attributes = {};
           map.set(element, record);
         }
@@ -336,7 +336,7 @@ class TreeMirrorClient {
   }
 
   applyChanged(summaries:Summary[]) {
-    var summary:Summary = summaries[0]
+    var summary:Summary = summaries[0];
 
     var removed:NodeData[] = summary.removed.map((node:Node) => {
       return this.serializeNode(node);

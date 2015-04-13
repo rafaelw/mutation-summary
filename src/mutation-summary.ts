@@ -46,7 +46,7 @@ class NodeMap<T> {
   }
 
   private isIndex(s:string):boolean {
-    return +s === +s >>> 0;
+    return +s === <any>s >>> 0;
   }
 
   private nodeId(node:Node) {
@@ -84,7 +84,7 @@ class NodeMap<T> {
         continue;
       nodes.push(this.nodes[id]);
     }
-    
+
     return nodes;
   }
 }
@@ -590,7 +590,7 @@ class MutationProjection {
       var change = this.treeChanges.get(target);
       if (!change.characterData ||
           target.textContent == change.characterDataOldValue)
-        continue
+        continue;
 
       result.push(target);
     }
@@ -837,7 +837,7 @@ class Summary {
   constructor(private projection:MutationProjection, query:Query) {
     this.added = [];
     this.removed = [];
-    this.reparented = query.all || query.element ? [] : undefined;
+    this.reparented = query.all || query.element || query.characterData ? [] : undefined;
     this.reordered = query.all ? [] : undefined;
 
     projection.getChanged(this, query.elementFilter, query.characterData);
@@ -860,7 +860,7 @@ class Summary {
     }
 
     if (query.all || query.characterData) {
-      var characterDataChanged = projection.getCharacterDataChanged()
+      var characterDataChanged = projection.getCharacterDataChanged();
 
       if (query.characterData)
         this.valueChanged = characterDataChanged;
@@ -1372,7 +1372,7 @@ class Selector {
         case EQUAL:
           if (c == '=') {
             currentQualifier.attrValue = '';
-            state = VALUE_FIRST_CHAR
+            state = VALUE_FIRST_CHAR;
             break;
           }
 

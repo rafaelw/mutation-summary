@@ -22,7 +22,7 @@ function compareNodeArrayIgnoreOrder(expected:Node[], actual:Node[]) {
 
 suite('Mutation Summary', function() {
 
-  var testDiv:Element;
+  var testDiv:HTMLElement;
   var observer:MutationSummary;
   var observing:boolean;
   var changed:Node[];
@@ -47,7 +47,7 @@ suite('Mutation Summary', function() {
         throw 'Mutation Delivered at end of microtask'
       },
       queries: [query]
-    }
+    };
 
     if (extraOptions) {
       Object.keys(extraOptions).forEach(function(key) {
@@ -88,7 +88,7 @@ suite('Mutation Summary', function() {
     }
 
     // reparented
-    if (query.all || query.element) {
+    if (query.all || query.element || query.characterData) {
       assert(typeof expect.reparented === typeof changed.reparented);
       compareNodeArrayIgnoreOrder(expect.reparented, changed.reparented);
 
@@ -217,10 +217,10 @@ suite('Mutation Summary', function() {
     div2.setAttribute('foo', 'baz2');
     assertNothingReported();
   });
-  
+
   test('Attribute -- Array proto changed', function() {
     Array.prototype.foo = 'bar';
-    
+
     var div = document.createElement('div');
     testDiv.appendChild(div);
     div.setAttribute('foo', 'bar');
@@ -321,6 +321,7 @@ suite('Mutation Summary', function() {
     var div2 = testDiv.appendChild(document.createElement('div'));
     assertSummary({
       added: [comment2],
+      reparented: [],
       valueChanged: [text, comment],
       oldValues: ['foo', '123']
     });
@@ -330,6 +331,7 @@ suite('Mutation Summary', function() {
     div.removeChild(comment2);
     assertSummary({
       removed: [comment2],
+      reparented: [],
       valueChanged: [text],
       oldValues: ['bar']
     });
@@ -338,6 +340,13 @@ suite('Mutation Summary', function() {
     text.textContent = 'bat'; // Restoring its original value should mean
     // we won't hear about the change.
     assertNothingReported();
+
+    div2.appendChild(text);
+    assertSummary({
+      reparented: [text],
+      valueChanged: [],
+      oldValues: []
+    });
   });
 
   test('Element Basic', function() {
@@ -907,7 +916,7 @@ suite('Mutation Summary', function() {
     var divC = document.createElement('div');
     testDiv.appendChild(divC);
     divC.id = 'c';
-    var divD = document.createElement('div')
+    var divD = document.createElement('div');
     testDiv.appendChild(divD);
     divD.id = 'd';
 
@@ -931,7 +940,7 @@ suite('Mutation Summary', function() {
     var divB = document.createElement('div');
     testDiv.appendChild(divB);
     divB.id = 'b';
-    var divC = document.createElement('div')
+    var divC = document.createElement('div');
     testDiv.appendChild(divC);
     divC.id = 'c';
 
@@ -1023,7 +1032,7 @@ suite('Mutation Summary', function() {
         count++;
 
         if (count == 1) {
-          assert.strictEqual(summary.added.length, 1)
+          assert.strictEqual(summary.added.length, 1);
           div = testDiv.appendChild(document.createElement('div'));
         } else if (count == 2) {
           assert.strictEqual(summary.added.length, 2);
@@ -1045,7 +1054,7 @@ suite('Mutation Summary', function() {
         count++;
 
         if (count == 1) {
-          assert.strictEqual(summary.added.length, 1)
+          assert.strictEqual(summary.added.length, 1);
           div = testDiv.appendChild(document.createElement('div'));
         } else if (count == 2) {
           assert.strictEqual(summary.added.length, 2);
@@ -1093,7 +1102,7 @@ suite('Mutation Summary', function() {
 
 suite('TreeMirror Fuzzer', function() {
 
-  var testDiv:Element;
+  var testDiv:HTMLElement;
 
   setup(function() {
     testDiv = document.createElement('div');
@@ -1109,7 +1118,7 @@ suite('TreeMirror Fuzzer', function() {
     var NON_DOC_ROOTS_MAX = 4;
 
 
-    var allNodes:Node[] = []
+    var allNodes:Node[] = [];
     var nonRootNodes:Node[] = [];
 
     // Generate random document.
@@ -1140,7 +1149,7 @@ suite('TreeMirror Fuzzer', function() {
     testingQueries.push(elementQuery);
 
     var pass = 0;
-    var mirrorRoot = testDiv.cloneNode(false);
+    var mirrorRoot = <HTMLElement> testDiv.cloneNode(false);
     var mirrorClient = new TreeMirrorClient(testDiv, new TreeMirror(mirrorRoot), testingQueries);
 
     function doNextPass() {
@@ -1161,7 +1170,7 @@ suite('TreeMirror Fuzzer', function() {
         async();
       } else
         doNextPass();
-    };
+    }
 
     doNextPass();
   });
@@ -1169,7 +1178,7 @@ suite('TreeMirror Fuzzer', function() {
   function testRandomCloneAndTestCopy() {
     randomTree(testDiv, 512);
     var copy = testDiv.cloneNode(true);
-    assertTreesEqual(testDiv, copy);
+    assertTreesEqual(<HTMLElement>testDiv, <HTMLElement>copy);
   }
 
   function assertTreesEqual(node:Node, copy:Node) {
@@ -1191,7 +1200,7 @@ suite('TreeMirror Fuzzer', function() {
 
     var copyChild = copy.firstChild;
     for (var child = node.firstChild; child; child = child.nextSibling) {
-      assertTreesEqual(child, copyChild);
+      assertTreesEqual(<HTMLElement>child, <HTMLElement>copyChild);
       copyChild = copyChild.nextSibling;
     }
   }
