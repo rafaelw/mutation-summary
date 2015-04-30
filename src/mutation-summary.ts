@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+declare var WebKitMutationObserver: any;
+
 var MutationObserverCtor;
 if (typeof WebKitMutationObserver !== 'undefined')
   MutationObserverCtor = WebKitMutationObserver;
