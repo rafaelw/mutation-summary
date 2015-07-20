@@ -17,7 +17,6 @@ var observer;
 if (typeof WebKitMutationObserver != 'function') {
   console.error('This example extension requires MutationObservers. ' +
                 'Try the Chrome Canary build.');
-  return;
 }
 
 chrome.extension.onConnect.addListener(function(port) {
