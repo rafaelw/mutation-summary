@@ -17,8 +17,11 @@
   ],
   "license": "Apache 2.0",
   "ignore": [
+    "docs/",
+    "examples/",
     "node_modules/",
-    "tests/"
+    "tests/",
+    "util/"
   ],
   "repository": {
     "type": "git",
