@@ -17,8 +17,12 @@
   ],
   "license": "Apache 2.0",
   "ignore": [
-    "node_modules",
-    "tests"
+    "node_modules/",
+    "tests/"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/brucek/mutation-summary.git"
+  },
   "private": true
 }
