@@ -2,7 +2,7 @@
 ///<reference path='../src/mutation-summary.ts'/>
 ///<reference path='../util/tree-mirror.ts'/>
 function compareNodeArrayIgnoreOrder(expected, actual) {
-    assert.strictEqual(expected.length, actual.length);
+    assert.strictEqual(actual.length, expected.length);
     var map = new MutationSummary.NodeMap();
     expected.forEach(function (node) {
         map.set(node, true);
@@ -61,7 +61,7 @@ suite('Mutation Summary', function () {
         compareNodeArrayIgnoreOrder(expect.removed, changed.removed);
         if (options.oldPreviousSibling) {
             expect.removed.forEach(function (node, index) {
-                assert.strictEqual(expect.removedOldPreviousSibling[index], changed.getOldPreviousSibling(node));
+                assert.strictEqual(changed.getOldPreviousSibling(node), expect.removedOldPreviousSibling[index]);
             });
         }
         // reparented
@@ -70,11 +70,10 @@ suite('Mutation Summary', function () {
             compareNodeArrayIgnoreOrder(expect.reparented, changed.reparented);
             if (options.oldPreviousSibling) {
                 expect.reparented.forEach(function (node, index) {
-                    assert.strictEqual(expect.reparentedOldPreviousSibling[index], changed.getOldPreviousSibling(node));
+                    assert.strictEqual(changed.getOldPreviousSibling(node), expect.reparentedOldPreviousSibling[index]);
                 });
             }
-        }
-        else {
+        } else {
             assert.isUndefined(changed.reparented);
         }
         // reordered
@@ -82,10 +81,9 @@ suite('Mutation Summary', function () {
             assert(typeof expect.reordered == typeof changed.reordered);
             compareNodeArrayIgnoreOrder(expect.reordered, changed.reordered);
             expect.reordered.forEach(function (node, index) {
-                assert.strictEqual(expect.reorderedOldPreviousSibling[index], changed.getOldPreviousSibling(node));
+                assert.strictEqual(changed.getOldPreviousSibling(node), expect.reorderedOldPreviousSibling[index]);
             });
-        }
-        else {
+        } else {
             assert.isUndefined(changed.reordered);
         }
         // valueChanged
@@ -94,24 +92,22 @@ suite('Mutation Summary', function () {
             compareNodeArrayIgnoreOrder(expect.valueChanged, changed.valueChanged);
             var getOldFunction = query.attribute ? 'getOldAttribute' : 'getOldCharacterData';
             expect.valueChanged.forEach(function (node, index) {
-                assert.strictEqual(expect.oldValues[index], changed[getOldFunction](node, query.attribute));
+                assert.strictEqual(changed[getOldFunction](node, query.attribute), expect.oldValues[index]);
             });
-        }
-        else {
+        } else {
             assert.isUndefined(changed.valueChanged);
         }
         // attributeChanged
         if (query.all || query.elementAttributes) {
             assert(typeof expect.attributeChanged == typeof changed.attributeChanged);
-            assert.strictEqual(Object.keys(expect.attributeChanged).length, Object.keys(changed.attributeChanged).length);
+            assert.strictEqual(Object.keys(changed.attributeChanged).length, Object.keys(expect.attributeChanged).length);
             Object.keys(expect.attributeChanged).forEach(function (attrName) {
                 compareNodeArrayIgnoreOrder(expect.attributeChanged[attrName], changed.attributeChanged[attrName]);
                 expect.attributeOldValue[attrName].forEach(function (attrOldValue, index) {
-                    assert.strictEqual(expect.attributeOldValue[attrName][index], changed.getOldAttribute(expect.attributeChanged[attrName][index], attrName));
+                    assert.strictEqual(changed.getOldAttribute(expect.attributeChanged[attrName][index], attrName), expect.attributeOldValue[attrName][index]);
                 });
             });
-        }
-        else {
+        } else {
             assert.isUndefined(changed.attributeChanged);
         }
     }
@@ -303,7 +299,7 @@ suite('Mutation Summary', function () {
     });
     test('Element Attribute Specified', function () {
         startObserving({
-            element: 'div[foo], A, *[bar], div[ baz = "bat"], span#foo[blow~=blarg]'
+            element: 'div[foo], A, *[bar], div[ baz = "bat"], span#foo[blow~=blarg], span[some^=thing], span[another$=.html], ' + 'span[splat*=atat], div[lang|=en]'
         });
         var div = document.createElement('div');
         testDiv.appendChild(div);
@@ -319,6 +315,18 @@ suite('Mutation Summary', function () {
         var p = document.createElement('P');
         testDiv.appendChild(p);
         p.setAttribute('baz', 'baz');
+        var span2 = document.createElement('span');
+        span2.setAttribute('some', 'not a thing');
+        div2.appendChild(span2);
+        var span3 = document.createElement('span');
+        span3.setAttribute('another', '.html at the front');
+        div3.appendChild(span3);
+        var span4 = document.createElement('span');
+        span4.setAttribute('splat', 'no at at');
+        p.appendChild(span4);
+        var div4 = document.createElement('div');
+        testDiv.appendChild(div4);
+        div4.setAttribute('lang', 'not-en-matching');
         assertSummary({
             added: [div]
         });
@@ -328,12 +336,17 @@ suite('Mutation Summary', function () {
         div3.setAttribute('baz', 'bat');
         span.id = 'foo';
         span.setAttribute('blow', 'blarg bloog');
+        span2.setAttribute('some', 'thinggood');
+        span3.setAttribute('another', 'this one ends in.html');
+        span4.setAttribute('splat', 'some-atat-thing');
+        div4.setAttribute('lang', 'en-yes');
         assertSummary({
-            added: [p, div3, span],
+            added: [p, div3, span, span2, span3, span4, div4],
             removed: [div]
         });
         div3.removeAttribute('baz');
         div3.setAttribute('baz', 'bat');
+        div4.setAttribute('lang', 'en');
         assertNothingReported();
     });
     test('Case Insensitive Element Attributes', function () {
@@ -445,7 +458,7 @@ suite('Mutation Summary', function () {
         testDiv.appendChild(div2);
         startObserving({
             element: '  div[  baz  ]',
-            elementAttributes: 'foo boo',
+            elementAttributes: 'foo boo'
         });
         div.setAttribute('foo', 'bar2');
         div.setAttribute('baz', 'bat2');
@@ -534,7 +547,7 @@ suite('Mutation Summary', function () {
         });
         div.removeChild(span);
         assertSummary({
-            removed: [span],
+            removed: [span]
         });
     });
     test('Sequential Removals', function () {
@@ -838,16 +851,14 @@ suite('Mutation Summary', function () {
                 var summary = summaries[0];
                 count++;
                 if (count == 1) {
-                    assert.strictEqual(1, summary.added.length);
+                    assert.strictEqual(summary.added.length, 1);
                     div = testDiv.appendChild(document.createElement('div'));
-                }
-                else if (count == 2) {
-                    assert.strictEqual(2, summary.added.length);
+                } else if (count == 2) {
+                    assert.strictEqual(summary.added.length, 2);
                     div = testDiv.appendChild(document.createElement('div'));
                     summary1.disconnect();
-                }
-                else if (count == 3) {
-                    assert.strictEqual(1, summary.added.length);
+                } else if (count == 3) {
+                    assert.strictEqual(summary.added.length, 1);
                     summary1.disconnect();
                     async();
                 }
@@ -860,16 +871,14 @@ suite('Mutation Summary', function () {
                 var summary = summaries[0];
                 count++;
                 if (count == 1) {
-                    assert.strictEqual(1, summary.added.length);
+                    assert.strictEqual(summary.added.length, 1);
                     div = testDiv.appendChild(document.createElement('div'));
-                }
-                else if (count == 2) {
-                    assert.strictEqual(2, summary.added.length);
+                } else if (count == 2) {
+                    assert.strictEqual(summary.added.length, 2);
                     div = testDiv.appendChild(document.createElement('div'));
                     summary2.disconnect();
-                }
-                else if (count == 3) {
-                    assert.strictEqual(1, summary.added.length);
+                } else if (count == 3) {
+                    assert.strictEqual(summary.added.length, 1);
                     summary2.disconnect();
                     async();
                 }
@@ -891,7 +900,7 @@ suite('Mutation Summary', function () {
                 setTimeout(function () {
                     div.setAttribute('bar', 'baz');
                     setTimeout(function () {
-                        assert.strictEqual(1, callbackCount);
+                        assert.strictEqual(callbackCount, 1);
                         async();
                     });
                 }, 0);
@@ -950,11 +959,9 @@ suite('TreeMirror Fuzzer', function () {
             if (pass >= PASSES) {
                 mirrorClient.disconnect();
                 async();
-            }
-            else
+            } else
                 doNextPass();
         }
-        ;
         doNextPass();
     });
     function testRandomCloneAndTestCopy() {
@@ -963,20 +970,19 @@ suite('TreeMirror Fuzzer', function () {
         assertTreesEqual(testDiv, copy);
     }
     function assertTreesEqual(node, copy) {
-        assert.strictEqual(node.tagName, copy.tagName);
-        assert.strictEqual(node.id, copy.id);
-        assert.strictEqual(node.nodeType, copy.nodeType);
+        assert.strictEqual(copy.tagName, node.tagName);
+        assert.strictEqual(copy.id, node.id);
+        assert.strictEqual(copy.nodeType, node.nodeType);
         if (node.nodeType == Node.ELEMENT_NODE) {
-            assert.strictEqual(node.attributes.length, copy.attributes.length);
+            assert.strictEqual(copy.attributes.length, node.attributes.length);
             for (var i = 0; i < node.attributes.length; i++) {
                 var attr = node.attributes[i];
-                assert.strictEqual(attr.value, copy.getAttribute(attr.name));
+                assert.strictEqual(copy.getAttribute(attr.name), attr.value);
             }
+        } else {
+            assert.strictEqual(copy.textContent, node.textContent);
         }
-        else {
-            assert.strictEqual(node.textContent, copy.textContent);
-        }
-        assert.strictEqual(node.childNodes.length, copy.childNodes.length);
+        assert.strictEqual(copy.childNodes.length, node.childNodes.length);
         var copyChild = copy.firstChild;
         for (var child = node.firstChild; child; child = child.nextSibling) {
             assertTreesEqual(child, copyChild);
@@ -1054,8 +1060,7 @@ suite('TreeMirror Fuzzer', function () {
                 node = document.createTextNode(text);
             else
                 node = document.createComment(text);
-        }
-        else {
+        } else {
             node = document.createElement(randomTagname());
         }
         return node;

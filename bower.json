@@ -1,0 +1,31 @@
+{
+  "name": "brucek-mutation-summary",
+  "description": "Makes observing the DOM fast and easy",
+  "main": [
+    "src/mutation-summary.js"
+  ],
+  "moduleType": [
+    "globals"
+  ],
+  "keywords": [
+    "dom",
+    "mutation",
+    "observer"
+  ],
+  "authors": [
+    ""
+  ],
+  "license": "Apache 2.0",
+  "ignore": [
+    "docs/",
+    "examples/",
+    "node_modules/",
+    "tests/",
+    "util/"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/brucek/mutation-summary.git"
+  },
+  "private": true
+}

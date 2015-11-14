@@ -13,9 +13,9 @@
 // limitations under the License.
 
 function assertSelectorNames(selectors, expectSelectorStrings) {
-  assert.strictEqual(expectSelectorStrings.length, selectors.length);
+  assert.strictEqual(selectors.length, expectSelectorStrings.length);
   expectSelectorStrings.forEach(function(expectSelectorString, i) {
-    assert.strictEqual(expectSelectorString, selectors[i].selectorString);
+    assert.strictEqual(selectors[i].selectorString, expectSelectorString);
   });
 }
 
@@ -256,10 +256,6 @@ suite('Setup', function() {
       MutationSummary.parseElementFilter('div[foo=bar baz]');
     });
 
-    assert.throws(function() {
-      MutationSummary.parseElementFilter('div[foo|=bar]');
-    });
-
     assertSelectorNames(
       MutationSummary.parseElementFilter('div[foo~=bar]'),
       ['div[foo~="bar"]']
@@ -276,6 +272,78 @@ suite('Setup', function() {
 
     assert.throws(function() {
       MutationSummary.parseElementFilter('div[foo~ =bar]');
+    });
+
+    assertSelectorNames(
+      MutationSummary.parseElementFilter('div[foo^=bar]'),
+      ['div[foo^="bar"]']
+    );
+
+    assertSelectorNames(
+      MutationSummary.parseElementFilter('div[foo^="bar  "]'),
+      ['div[foo^="bar  "]']
+    );
+
+    assert.throws(function() {
+      MutationSummary.parseElementFilter('div[foo^=]');
+    });
+
+    assert.throws(function() {
+      MutationSummary.parseElementFilter('div[foo^ =bar]');
+    });
+
+    assertSelectorNames(
+      MutationSummary.parseElementFilter('div[foo$=bar]'),
+      ['div[foo$="bar"]']
+    );
+
+    assertSelectorNames(
+      MutationSummary.parseElementFilter('div[foo$="bar  "]'),
+      ['div[foo$="bar  "]']
+    );
+
+    assert.throws(function() {
+      MutationSummary.parseElementFilter('div[foo$=]');
+    });
+
+    assert.throws(function() {
+      MutationSummary.parseElementFilter('div[foo$ =bar]');
+    });
+
+    assertSelectorNames(
+      MutationSummary.parseElementFilter('div[foo*=bar]'),
+      ['div[foo*="bar"]']
+    );
+
+    assertSelectorNames(
+      MutationSummary.parseElementFilter('div[foo*="bar  "]'),
+      ['div[foo*="bar  "]']
+    );
+
+    assert.throws(function() {
+      MutationSummary.parseElementFilter('div[foo*=]');
+    });
+
+    assert.throws(function() {
+      MutationSummary.parseElementFilter('div[foo* =bar]');
+    });
+
+    assertSelectorNames(
+      MutationSummary.parseElementFilter('div[foo|=bar]'),
+      ['div[foo|="bar"]']
+    );
+
+    assertSelectorNames(
+      MutationSummary.parseElementFilter('div[foo|="bar  "]'),
+      ['div[foo|="bar  "]']
+    );
+
+    assert.throws(function() {
+      MutationSummary.parseElementFilter('div[foo|=]');
+    });
+
+    assert.throws(function() {
+      MutationSummary.parseElementFilter('div[foo| =bar]');
     });
 
     assertSelectorNames(
@@ -317,7 +385,7 @@ suite('Setup', function() {
     // queries is required.
     assert.throws(function() {
       new MutationSummary({
-        callback: function() {},
+        callback: function() {}
       });
     });
 
@@ -434,7 +502,7 @@ suite('Setup', function() {
     assert.throws(function() {
       new MutationSummary({
         callback: function() {},
-        queries: [{ element: 'div[noTrailingBracket', }]
+        queries: [{ element: 'div[noTrailingBracket' }]
       });
     });
 

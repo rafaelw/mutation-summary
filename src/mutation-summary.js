@@ -271,7 +271,7 @@ var TreeChanges = (function (_super) {
     return TreeChanges;
 })(NodeMap);
 var MutationProjection = (function () {
-    // TOOD(any)
+    // TODO(any)
     function MutationProjection(rootNode, mutations, selectors, calcReordered, calcOldPreviousSibling) {
         this.rootNode = rootNode;
         this.mutations = mutations;
@@ -730,16 +730,34 @@ var validNameNonInitialChar = /[a-zA-Z0-9_\-]+/;
 function escapeQuotes(value) {
     return '"' + value.replace(/"/, '\\\"') + '"';
 }
+var Modifier;
+(function (Modifier) {
+    Modifier[Modifier["none"] = 0] = "none";
+    Modifier[Modifier["containsToken"] = 1] = "containsToken";
+    Modifier[Modifier["startsWith"] = 2] = "startsWith";
+    Modifier[Modifier["endsWith"] = 3] = "endsWith";
+    Modifier[Modifier["containsAny"] = 4] = "containsAny";
+    Modifier[Modifier["startsHyphen"] = 5] = "startsHyphen";
+})(Modifier || (Modifier = {}));
 var Qualifier = (function () {
     function Qualifier() {
+        this.modifier = Modifier.none;
     }
     Qualifier.prototype.matches = function (oldValue) {
         if (oldValue === null)
             return false;
         if (this.attrValue === undefined)
             return true;
-        if (!this.contains)
+        if (this.modifier == Modifier.none)
             return this.attrValue == oldValue;
+        if (this.modifier == Modifier.startsWith)
+            return this.attrValue == oldValue.slice(0, this.attrValue.length);
+        if (this.modifier == Modifier.endsWith)
+            return this.attrValue == oldValue.slice(-this.attrValue.length);
+        if (this.modifier == Modifier.containsAny)
+            return oldValue.indexOf(this.attrValue) != -1;
+        if (this.modifier == Modifier.startsHyphen)
+            return this.attrValue == oldValue || (this.attrValue + '-') == oldValue.slice(0, this.attrValue.length + 1);
         var tokens = oldValue.split(' ');
         for (var i = 0; i < tokens.length; i++) {
             if (this.attrValue === tokens[i])
@@ -748,12 +766,20 @@ var Qualifier = (function () {
         return false;
     };
     Qualifier.prototype.toString = function () {
-        if (this.attrName === 'class' && this.contains)
+        if (this.attrName === 'class' && this.modifier == Modifier.containsToken)
             return '.' + this.attrValue;
-        if (this.attrName === 'id' && !this.contains)
+        if (this.attrName === 'id' && this.modifier == Modifier.none)
             return '#' + this.attrValue;
-        if (this.contains)
+        if (this.modifier == Modifier.containsToken)
             return '[' + this.attrName + '~=' + escapeQuotes(this.attrValue) + ']';
+        if (this.modifier == Modifier.startsWith)
+            return '[' + this.attrName + '^=' + escapeQuotes(this.attrValue) + ']';
+        if (this.modifier == Modifier.endsWith)
+            return '[' + this.attrName + '$=' + escapeQuotes(this.attrValue) + ']';
+        if (this.modifier == Modifier.containsAny)
+            return '[' + this.attrName + '*=' + escapeQuotes(this.attrValue) + ']';
+        if (this.modifier == Modifier.startsHyphen)
+            return '[' + this.attrName + '|=' + escapeQuotes(this.attrValue) + ']';
         if ('attrValue' in this)
             return '[' + this.attrName + '=' + escapeQuotes(this.attrValue) + ']';
         return '[' + this.attrName + ']';
@@ -874,7 +900,7 @@ var Selector = (function () {
                         newQualifier();
                         currentSelector.tagName = '*';
                         currentQualifier.attrName = 'class';
-                        currentQualifier.contains = true;
+                        currentQualifier.modifier = Modifier.containsToken;
                         state = QUALIFIER_NAME_FIRST_CHAR;
                         break;
                     }
@@ -905,7 +931,7 @@ var Selector = (function () {
                     if (c == '.') {
                         newQualifier();
                         currentQualifier.attrName = 'class';
-                        currentQualifier.contains = true;
+                        currentQualifier.modifier = Modifier.containsToken;
                         state = QUALIFIER_NAME_FIRST_CHAR;
                         break;
                     }
@@ -934,7 +960,7 @@ var Selector = (function () {
                     if (c == '.') {
                         newQualifier();
                         currentQualifier.attrName = 'class';
-                        currentQualifier.contains = true;
+                        currentQualifier.modifier = Modifier.containsToken;
                         state = QUALIFIER_NAME_FIRST_CHAR;
                         break;
                     }
@@ -974,7 +1000,7 @@ var Selector = (function () {
                     if (c == '.') {
                         newQualifier();
                         currentQualifier.attrName = 'class';
-                        currentQualifier.contains = true;
+                        currentQualifier.modifier = Modifier.containsToken;
                         state = QUALIFIER_NAME_FIRST_CHAR;
                         break;
                     }
@@ -1017,7 +1043,27 @@ var Selector = (function () {
                         break;
                     }
                     if (c == '~') {
-                        currentQualifier.contains = true;
+                        currentQualifier.modifier = Modifier.containsToken;
+                        state = EQUAL;
+                        break;
+                    }
+                    if (c == '^') {
+                        currentQualifier.modifier = Modifier.startsWith;
+                        state = EQUAL;
+                        break;
+                    }
+                    if (c == '$') {
+                        currentQualifier.modifier = Modifier.endsWith;
+                        state = EQUAL;
+                        break;
+                    }
+                    if (c == '*') {
+                        currentQualifier.modifier = Modifier.containsAny;
+                        state = EQUAL;
+                        break;
+                    }
+                    if (c == '|') {
+                        currentQualifier.modifier = Modifier.startsHyphen;
                         state = EQUAL;
                         break;
                     }
@@ -1033,7 +1079,27 @@ var Selector = (function () {
                     throw Error(SYNTAX_ERROR);
                 case EQUIV_OR_ATTR_QUAL_END:
                     if (c == '~') {
-                        currentQualifier.contains = true;
+                        currentQualifier.modifier = Modifier.containsToken;
+                        state = EQUAL;
+                        break;
+                    }
+                    if (c == '^') {
+                        currentQualifier.modifier = Modifier.startsWith;
+                        state = EQUAL;
+                        break;
+                    }
+                    if (c == '$') {
+                        currentQualifier.modifier = Modifier.endsWith;
+                        state = EQUAL;
+                        break;
+                    }
+                    if (c == '*') {
+                        currentQualifier.modifier = Modifier.containsAny;
+                        state = EQUAL;
+                        break;
+                    }
+                    if (c == '|') {
+                        currentQualifier.modifier = Modifier.startsHyphen;
                         state = EQUAL;
                         break;
                     }

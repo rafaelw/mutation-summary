@@ -37,7 +37,7 @@ MutationSummary.createQueryValidator = function(root, query) {
     function allValidator(summary, stayed, old, current) {
       summary.reordered.forEach(function(node) {
         var oldPreviousSiblingMap = old.get(summary.getOldParentNode(node));
-        assert.strictEqual(oldPreviousSiblingMap.get(node), summary.getOldPreviousSibling(node));
+        assert.strictEqual(summary.getOldPreviousSibling(node), oldPreviousSiblingMap.get(node));
       });
     }
 
@@ -61,7 +61,7 @@ MutationSummary.createQueryValidator = function(root, query) {
       compareNodeArrayIgnoreOrder(changed, summary.valueChanged);
 
       changed.forEach(function(node) {
-        assert.strictEqual(old.get(node), summary.getOldCharacterData(node));
+        assert.strictEqual(summary.getOldCharacterData(node), old.get(node));
       });
     }
 
@@ -85,7 +85,7 @@ MutationSummary.createQueryValidator = function(root, query) {
       compareNodeArrayIgnoreOrder(changed, summary.valueChanged);
 
       changed.forEach(function(node) {
-        assert.strictEqual(old.get(node), summary.getOldAttribute(node, query.attribute));
+        assert.strictEqual(summary.getOldAttribute(node, query.attribute), old.get(node));
       });
     }
 
@@ -160,7 +160,7 @@ MutationSummary.createQueryValidator = function(root, query) {
       });
 
       function checkOldParentNode(node) {
-        assert.strictEqual(old.get(node).parentNode, summary.getOldParentNode(node));
+        assert.strictEqual(summary.getOldParentNode(node), old.get(node).parentNode);
       }
 
       summary.removed.forEach(checkOldParentNode);

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+declare var WebKitMutationObserver: any;
+
 var MutationObserverCtor;
 if (typeof WebKitMutationObserver !== 'undefined')
   MutationObserverCtor = WebKitMutationObserver;
@@ -335,7 +337,7 @@ class MutationProjection {
   private characterDataOnly:boolean;
   private matchCache:NumberMap<NodeMap<Movement>>;
 
-  // TOOD(any)
+  // TODO(any)
   constructor(public rootNode:Node,
               public mutations:MutationRecord[],
               public selectors:Selector[],
@@ -590,7 +592,7 @@ class MutationProjection {
       var change = this.treeChanges.get(target);
       if (!change.characterData ||
           target.textContent == change.characterDataOldValue)
-        continue
+        continue;
 
       result.push(target);
     }
@@ -860,7 +862,7 @@ class Summary {
     }
 
     if (query.all || query.characterData) {
-      var characterDataChanged = projection.getCharacterDataChanged()
+      var characterDataChanged = projection.getCharacterDataChanged();
 
       if (query.characterData)
         this.valueChanged = characterDataChanged;
@@ -901,10 +903,12 @@ function escapeQuotes(value:string):string {
   return '"' + value.replace(/"/, '\\\"') + '"';
 }
 
+enum Modifier { none, containsToken, startsWith, endsWith, containsAny, startsHyphen }
+
 class Qualifier {
   public attrName:string;
   public attrValue:string;
-  public contains:boolean;
+  public modifier:Modifier = Modifier.none;
 
   constructor() {}
 
@@ -915,8 +919,20 @@ class Qualifier {
     if (this.attrValue === undefined)
       return true;
 
-    if (!this.contains)
+    if (this.modifier == Modifier.none)
       return this.attrValue == oldValue;
+
+    if (this.modifier == Modifier.startsWith)
+      return this.attrValue == oldValue.slice(0, this.attrValue.length);
+
+    if (this.modifier == Modifier.endsWith)
+      return this.attrValue == oldValue.slice(-this.attrValue.length);
+
+    if (this.modifier == Modifier.containsAny)
+      return oldValue.indexOf(this.attrValue) != -1;
+
+    if (this.modifier == Modifier.startsHyphen)
+      return this.attrValue == oldValue || (this.attrValue + '-') == oldValue.slice(0, this.attrValue.length + 1);
 
     var tokens = oldValue.split(' ');
     for (var i = 0; i < tokens.length; i++) {
@@ -928,14 +944,26 @@ class Qualifier {
   }
 
   public toString():string {
-    if (this.attrName === 'class' && this.contains)
+    if (this.attrName === 'class' && this.modifier == Modifier.containsToken)
       return '.' + this.attrValue;
 
-    if (this.attrName === 'id' && !this.contains)
+    if (this.attrName === 'id' && this.modifier == Modifier.none)
       return '#' + this.attrValue;
 
-    if (this.contains)
+    if (this.modifier == Modifier.containsToken)
       return '[' + this.attrName + '~=' + escapeQuotes(this.attrValue) + ']';
+
+    if (this.modifier == Modifier.startsWith)
+      return '[' + this.attrName + '^=' + escapeQuotes(this.attrValue) + ']';
+
+    if (this.modifier == Modifier.endsWith)
+      return '[' + this.attrName + '$=' + escapeQuotes(this.attrValue) + ']';
+
+    if (this.modifier == Modifier.containsAny)
+      return '[' + this.attrName + '*=' + escapeQuotes(this.attrValue) + ']';
+
+    if (this.modifier == Modifier.startsHyphen)
+      return '[' + this.attrName + '|=' + escapeQuotes(this.attrValue) + ']';
 
     if ('attrValue' in this)
       return '[' + this.attrName + '=' + escapeQuotes(this.attrValue) + ']';
@@ -1088,7 +1116,7 @@ class Selector {
             newQualifier();
             currentSelector.tagName = '*';
             currentQualifier.attrName = 'class';
-            currentQualifier.contains = true;
+            currentQualifier.modifier = Modifier.containsToken;
             state = QUALIFIER_NAME_FIRST_CHAR;
             break;
           }
@@ -1123,7 +1151,7 @@ class Selector {
           if (c == '.') {
             newQualifier();
             currentQualifier.attrName = 'class';
-            currentQualifier.contains = true;
+            currentQualifier.modifier = Modifier.containsToken;
             state = QUALIFIER_NAME_FIRST_CHAR;
             break;
           }
@@ -1156,7 +1184,7 @@ class Selector {
           if (c == '.') {
             newQualifier();
             currentQualifier.attrName = 'class';
-            currentQualifier.contains = true;
+            currentQualifier.modifier = Modifier.containsToken;
             state = QUALIFIER_NAME_FIRST_CHAR;
             break;
           }
@@ -1203,7 +1231,7 @@ class Selector {
           if (c == '.') {
             newQualifier();
             currentQualifier.attrName = 'class';
-            currentQualifier.contains = true;
+            currentQualifier.modifier = Modifier.containsToken;
             state = QUALIFIER_NAME_FIRST_CHAR;
             break;
           }
@@ -1254,7 +1282,31 @@ class Selector {
           }
 
           if (c == '~') {
-            currentQualifier.contains = true;
+            currentQualifier.modifier = Modifier.containsToken;
+            state = EQUAL;
+            break;
+          }
+
+          if (c == '^') {
+            currentQualifier.modifier = Modifier.startsWith;
+            state = EQUAL;
+            break;
+          }
+
+          if (c == '$') {
+            currentQualifier.modifier = Modifier.endsWith;
+            state = EQUAL;
+            break;
+          }
+
+          if (c == '*') {
+            currentQualifier.modifier = Modifier.containsAny;
+            state = EQUAL;
+            break;
+          }
+
+          if (c == '|') {
+            currentQualifier.modifier = Modifier.startsHyphen;
             state = EQUAL;
             break;
           }
@@ -1274,7 +1326,31 @@ class Selector {
 
         case EQUIV_OR_ATTR_QUAL_END:
           if (c == '~') {
-            currentQualifier.contains = true;
+            currentQualifier.modifier = Modifier.containsToken;
+            state = EQUAL;
+            break;
+          }
+
+          if (c == '^') {
+            currentQualifier.modifier = Modifier.startsWith;
+            state = EQUAL;
+            break;
+          }
+
+          if (c == '$') {
+            currentQualifier.modifier = Modifier.endsWith;
+            state = EQUAL;
+            break;
+          }
+
+          if (c == '*') {
+            currentQualifier.modifier = Modifier.containsAny;
+            state = EQUAL;
+            break;
+          }
+
+          if (c == '|') {
+            currentQualifier.modifier = Modifier.startsHyphen;
             state = EQUAL;
             break;
           }
@@ -1298,7 +1374,7 @@ class Selector {
         case EQUAL:
           if (c == '=') {
             currentQualifier.attrValue = '';
-            state = VALUE_FIRST_CHAR
+            state = VALUE_FIRST_CHAR;
             break;
           }
 
