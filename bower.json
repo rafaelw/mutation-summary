@@ -1,0 +1,11 @@
+{
+  "name": "mutation-summary",
+  "description": "Makes observing the DOM fast and easy",
+  "main": "src/mutation-summary.js",
+  "authors": [
+    "Rafael Weinstein"
+  ],
+  "license": "Apache 2.0",
+  "homepage": "https://github.com/rafaelw/mutation-summary",
+  "moduleType": []
+}
