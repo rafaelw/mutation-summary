@@ -1173,7 +1173,7 @@ function elementFilterAttributes(selectors) {
     });
     return Object.keys(attributes);
 }
-var MutationSummary = (function () {
+MutationSummary = (function () {
     function MutationSummary(opts) {
         var _this = this;
         this.connected = false;
