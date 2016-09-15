@@ -17,7 +17,7 @@ var __extends = (this && this.__extends) || function (d, b) {
     __.prototype = b.prototype;
     d.prototype = new __();
 };
-define(["require", "exports"], function (require, exports) {
+define('mutation-summary', ["require", "exports"], function (require, exports) {
     var MutationObserverCtor;
     if (typeof WebKitMutationObserver !== 'undefined')
         MutationObserverCtor = WebKitMutationObserver;
