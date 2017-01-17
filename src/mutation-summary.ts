@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+declare var WebKitMutationObserver: any;
+
 var MutationObserverCtor;
 if (typeof WebKitMutationObserver !== 'undefined')
   MutationObserverCtor = WebKitMutationObserver;
@@ -1461,7 +1463,7 @@ interface Options {
   observeOwnChanges?:boolean;
 }
 
-class MutationSummary {
+export default class MutationSummary {
 
   public static NodeMap = NodeMap; // exposed for use in TreeMirror.
   public static parseElementFilter = Selector.parseSelectors; // exposed for testing.
