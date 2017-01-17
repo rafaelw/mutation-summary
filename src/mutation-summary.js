@@ -11,11 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-var __extends = this.__extends || function (d, b) {
+"use strict";
+var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
-    __.prototype = b.prototype;
-    d.prototype = new __();
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
 var MutationObserverCtor;
 if (typeof WebKitMutationObserver !== 'undefined')
@@ -70,7 +70,7 @@ var NodeMap = (function () {
     NodeMap.ID_PROP = '__mutation_summary_node_map_id__';
     NodeMap.nextId_ = 1;
     return NodeMap;
-})();
+}());
 /**
  *  var reachableMatchableProduct = [
  *  //  STAYED_OUT,  ENTERED,     STAYED_IN,   EXITED
@@ -173,7 +173,7 @@ var NodeChange = (function () {
         return this.node.parentNode;
     };
     return NodeChange;
-})();
+}());
 var ChildListChange = (function () {
     function ChildListChange() {
         this.added = new NodeMap();
@@ -183,7 +183,7 @@ var ChildListChange = (function () {
         this.moved = undefined;
     }
     return ChildListChange;
-})();
+}());
 var TreeChanges = (function (_super) {
     __extends(TreeChanges, _super);
     function TreeChanges(rootNode, mutations) {
@@ -269,7 +269,7 @@ var TreeChanges = (function (_super) {
             Movement.EXITED : Movement.STAYED_OUT;
     };
     return TreeChanges;
-})(NodeMap);
+}(NodeMap));
 var MutationProjection = (function () {
     // TOOD(any)
     function MutationProjection(rootNode, mutations, selectors, calcReordered, calcOldPreviousSibling) {
@@ -671,7 +671,7 @@ var MutationProjection = (function () {
         return change.moved.get(node);
     };
     return MutationProjection;
-})();
+}());
 var Summary = (function () {
     function Summary(projection, query) {
         var _this = this;
@@ -720,7 +720,7 @@ var Summary = (function () {
         return this.projection.getOldPreviousSibling(node);
     };
     return Summary;
-})();
+}());
 // TODO(rafaelw): Allow ':' and '.' as valid name characters.
 var validNameInitialChar = /[a-zA-Z_]+/;
 var validNameNonInitialChar = /[a-zA-Z0-9_\-]+/;
@@ -759,7 +759,7 @@ var Qualifier = (function () {
         return '[' + this.attrName + ']';
     };
     return Qualifier;
-})();
+}());
 var Selector = (function () {
     function Selector() {
         this.uid = Selector.nextUid++;
@@ -1133,7 +1133,7 @@ var Selector = (function () {
         return 'matchesSelector';
     })();
     return Selector;
-})();
+}());
 var attributeFilterPattern = /^([a-zA-Z:_]+[a-zA-Z0-9_\-:\.]*)$/;
 function validateAttribute(attribute) {
     if (typeof attribute != 'string')
@@ -1393,4 +1393,6 @@ var MutationSummary = (function () {
         'observeOwnChanges': true
     };
     return MutationSummary;
-})();
+}());
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.default = MutationSummary;
