@@ -10,7 +10,7 @@ Other resources:
 
 Let’s start with a contrived use case that illustrates the basics of using Mutation Summary: An imaginary micro-format, called “hTweet”. The purpose of hTweet is so that page authors can annotate any section of their pages with a hash-tag that is most-likely relevant, like so:
 
-```
+```html
 <span data-h-tweet=”#beiber”>Isn’t Justin dreamy?</span>
 ```
 
@@ -23,7 +23,7 @@ Our extension probably wants to know when:
 
 In order to do this, we’d create a `MutationSummary` object like this:
 
-```
+```javascript
 var observer = new MutationSummary({
   callback: handleHTweetChanges,
   queries: [{ attribute: 'data-h-tweet' }]
@@ -34,7 +34,7 @@ This creates a new `MutationSummary` that begins observing the entire document i
 
 Now, whenever any of the above three things have happened, `MutationSummary` will invoke our `handleHTweetChanges` and pass as the only argument an array containing a summary of changes for each query that was requested. We might implement `handleHTweetChanges` like this:
 
-```
+```javascript
 function handleHTweetChanges(summaries) {
   var hTweetSummary = summaries[0];
 
@@ -64,7 +64,7 @@ A couple things to note at this point:
 
 Let's look at another hypothetical example inspired by the requirements of real-world widget libraries like Dojo Widgets. Let’s say we’re creating a UI widget library that allows its widgets to be declared and configured in HTML:
 
-```
+```html
 <div data-widget=”fancyButton”   
      data-widget-theme=”midnight”>Click Me!</div>
 ```
@@ -73,7 +73,7 @@ Our library will probably want to look for all such elements in the page when it
 
 But our library also wants to respond to new widgets that appear in the page, possibly created by script or a templating library. In order to accomplish this, we’d create an [element query](APIReference.md#the-element-query) like this:
 
-```
+```javascript
 var observer = new MutationSummary({
   callback: updateWidgets,
   queries: [{
@@ -84,7 +84,7 @@ var observer = new MutationSummary({
 
 Here's what the `updateWidgets` function might look like:
 
-```
+```javascript
 function updateWidgets(summaries) {
   var widgetSummary = summaries[0];
   widgetSummary.added.forEach(buildNewWidget);
@@ -96,7 +96,7 @@ The [element query](APIReference.md#the-element-query) instructs the `MutationSu
 
 But doesn’t our widget library also want to respond correctly when an existing widget changes its type or theme? It does, and it can:
 
-```
+```javascript
 var observer = new MutationSummary({
   callback: updateWidgets,
   queries: [{
@@ -108,7 +108,7 @@ var observer = new MutationSummary({
 
 The optional `elementAttributes` property is just a space-separated list of attribute names and it asks the `MutationSummary` to report changes to the value of those attributes on elements matching the element string that have stayed in the document. Now our `updateWidgets` might look like this:
 
-```
+```javascript
 function updateWidgets(summaries) {
   var widgetSummary = summaries[0];
   widgetSummary.added.forEach(buildNewWidget);
@@ -122,18 +122,18 @@ function updateWidgets(summaries) {
 
 Let’s add one more complication: Say our widget library also allows in-line handling of events that its widgets can emit via a script element with a special type attribute:
 
-```
+```html
 <div data-widget=”autocomplete”>
   <script type=”widget/event-handler” data-event=”selectionMade”>
-    // Handle the user navigating over a autocomplete suggestion
-    // and pressing return or clicking.
+    <!-- Handle the user navigating over a autocomplete suggestion -->
+    <!-- and pressing return or clicking. -->
   </script>
 </div>
 ```
 
 Now our widget library wants to listen to two distinct kinds of things. Mutation Summary allows this by supporting multiple queries:
 
-```
+```javascript
 var observer = new MutationSummary({
   callback: updateWidgets,
   queries: [{
@@ -148,7 +148,7 @@ var observer = new MutationSummary({
 
 and our handler would now look like this:
 
-```
+```javascript
 function updateWidget(summaries) {
   var widgetSummary = summaries[0];
   var scriptHandlerSummary = summaries[1];
