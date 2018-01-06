@@ -133,7 +133,7 @@ Summarize the changes to the presence and location of the elements matching the 
 | **Selector**    | **Examples** |
 | :-------------- | :----------- |
 | Pseudo-elements | `“div:first-child”`, `“a:hover”` |
-| Attribute = value-match | `“div[foo|=bar]”` |
+| Attribute = value-match | `“div[foo\|=bar]”` |
 | Combinators     | `“div > span”`, `“div input”`, `“h1 + div”` |
 
 ### Response ###
