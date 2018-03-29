@@ -36,8 +36,8 @@ Mutation Observers are currently available in
 
 If Mutation Observers solves the problems with Mutation Events, why do I need a library?
 
-The Mutation Summary library solves a problem that neither Mutation Observers nor Mutation Events was designed to: Providing you with a clear statement about the "net-effect' of what happened.
+The Mutation Summary library solves a problem that neither Mutation Observers nor Mutation Events was designed to: Providing you with a clear statement about the “net-effect” of what happened.
 
 The information that Mutation Observers provides is just a list of “stuff that happened” to the DOM, in the order it happened -- kind of like a log. However, there's no guarantee that something that was done at one point in the log wasn't _undone_ at a later point. It's simply not safe to naively act on the log itself. Doing so risks poor performance (doing more work that you need to) and creating bugs in your web page (doing work under a mistaken set of assumptions).
 
-Mutation Summary takes the log that Mutation Observers provides and outputs the set of things that _definately has happened_. Whatever Mutation Summary tells you is true -- and it's safe to go ahead and act on it.
+Mutation Summary takes the log that Mutation Observers provides and outputs the set of things that _definitely has happened_. Whatever Mutation Summary tells you is true -- and it's safe to go ahead and act on it.
