@@ -1837,6 +1837,7 @@ import {
 				while (--i >= 0 && matches.item(i) !== this) {}
 				return i > -1;            
 			};
-	}	global.MutationSummary = MutationSummary;
+	}
+	global.MutationSummary = MutationSummary;
 
 }(window));
