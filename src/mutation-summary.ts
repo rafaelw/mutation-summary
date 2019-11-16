@@ -421,7 +421,7 @@ class MutationProjection {
 
     this.processChildlistChanges();
 
-    var parentNode = node.parentNode;
+    var parentNode = node.parentNode as Node;
     var nodeChange = this.treeChanges.get(node);
     if (nodeChange && nodeChange.oldParentNode)
       parentNode = nodeChange.oldParentNode;
@@ -487,7 +487,7 @@ class MutationProjection {
   }
 
   getOldPreviousSibling(node:Node):Node {
-    var parentNode = node.parentNode;
+    var parentNode = node.parentNode as Node;
     var nodeChange = this.treeChanges.get(node);
     if (nodeChange && nodeChange.oldParentNode)
       parentNode = nodeChange.oldParentNode;
@@ -613,7 +613,7 @@ class MutationProjection {
     return result;
   }
 
-  matchabilityChange(node:Node) {
+  matchabilityChange(node:Node): Movement {
     // TODO(rafaelw): Include PI, CDATA?
     // Only include text nodes.
     if (this.characterDataOnly) {
@@ -697,7 +697,7 @@ class MutationProjection {
 
       var oldPrevious = mutation.previousSibling;
 
-      function recordOldPrevious(node:Node, previous:Node) {
+      const recordOldPrevious = (node:Node, previous:Node) => {
         if (!node ||
             change.oldPrevious.has(node) ||
             change.added.has(node) ||
@@ -746,7 +746,7 @@ class MutationProjection {
 
     this.processChildlistChanges();
 
-    var parentNode = node.parentNode;
+    var parentNode = node.parentNode as Node;
     var nodeChange = this.treeChanges.get(node);
     if (nodeChange && nodeChange.oldParentNode)
       parentNode = nodeChange.oldParentNode;
@@ -825,7 +825,7 @@ class MutationProjection {
   }
 }
 
-class Summary {
+export class Summary {
   public added:Node[];
   public removed:Node[];
   public reparented:Node[];
@@ -940,6 +940,7 @@ class Qualifier {
     if ('attrValue' in this)
       return '[' + this.attrName + '=' + escapeQuotes(this.attrValue) + ']';
 
+    //@ts-ignore
     return '[' + this.attrName + ']';
   }
 }
@@ -1443,7 +1444,7 @@ function elementFilterAttributes(selectors:Selector[]):string[] {
   return Object.keys(attributes);
 }
 
-interface Query {
+export interface Query {
   element?:string;
   attribute?:string;
   all?:boolean;
@@ -1453,7 +1454,7 @@ interface Query {
   elementFilter?:Selector[];
 }
 
-interface Options {
+export interface Options {
   callback:(summaries:Summary[]) => any;
   queries: Query[];
   rootNode?:Node;
@@ -1461,7 +1462,7 @@ interface Options {
   observeOwnChanges?:boolean;
 }
 
-class MutationSummary {
+export class MutationSummary {
 
   public static NodeMap = NodeMap; // exposed for use in TreeMirror.
   public static parseElementFilter = Selector.parseSelectors; // exposed for testing.

@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "es5",
+    "module": "commonjs",
+    "declaration": true,
+    "outDir": "dist",
+    "strict": false,
+    "baseUrl": "./src",
+    "typeRoots": [ "typings" ],
+    "esModuleInterop": true,
+  },
+  "include": [
+    "src/**/*.ts",
+    "typings/*.ts"
+  ]
+}

@@ -219,7 +219,7 @@ suite('Mutation Summary', function() {
   });
 
   test('Attribute -- Array proto changed', function() {
-    Array.prototype.foo = 'bar';
+    (Array.prototype as any).foo = 'bar';
 
     var div = document.createElement('div');
     testDiv.appendChild(div);
@@ -259,7 +259,7 @@ suite('Mutation Summary', function() {
     div2.removeAttribute('foo');
     div2.setAttribute('foo', 'baz2');
     assertNothingReported();
-    delete Array.prototype.foo;
+    delete (Array.prototype as any).foo;
   });
 
   test('Attribute Case Insensitive', function() {

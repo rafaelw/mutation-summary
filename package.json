@@ -1,14 +1,15 @@
 {
   "name": "mutation-summary",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Makes observing the DOM fast and easy",
-  "main": "src/mutation-summary.js",
+  "main": "dist/mutation-summary.js",
+  "types": "dist/mutation-summary.d.ts",
   "directories": {
     "example": "examples",
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "prepublish": "tsc"
   },
   "repository": {
     "type": "git",
@@ -18,13 +19,10 @@
   "license": "Apache 2.0",
   "devDependencies": {
     "chai": "*",
-    "mocha": "*"
-  }
+    "mocha": "*",
+    "typescript": "^3.7.2"
+  },
+  "files": [
+    "dist"
+  ]
 }
-
-
-
-
-
-
-
