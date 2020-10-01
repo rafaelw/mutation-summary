@@ -13,7 +13,7 @@ It's built on top of (and requires) a new browser API called [DOM Mutation Obser
 
 Mutation Summary does five main things for you:
 
-  * **It tells you how the document is different now from how it was.** As its name suggests, it summarizes what’s happened. It’s as if it takes a picture of the document when you first create it, and then again after each time it calls you back. When things have changed, it calls you with a concise description of exactly what’s different now from the last picture it took for you.
+  * **It tells you how the document is different now from how it was.** As its name suggests, it summarizes what happened. It’s as if it takes a picture of the document when you first create it, and then again after each time it calls you back. When things have changed, it calls you with a concise description of exactly what’s different now from the last picture it took for you.
   * **It handles any and all changes, no matter how complex.** All kinds of things can happen to the DOM: values can change and but put back to what they were, large parts can be pulled out, changed, rearranged, put back. Mutation Summary can take any crazy thing you throw at it. Go ahead, tear the document to shreds, Mutation Summary won’t even blink.
   * **It lets you express what kinds of things you’re interested in.** It presents a query API that lets you tell it exactly what kinds of changes you’re interested in. This includes support for simple CSS-like selector descriptions of elements you care about.
   * **It’s fast.** The time and memory it takes is dependant on number of changes that occurred (which typically involves only a few nodes) -- not the size of your document (which is commonly thousands of nodes).
